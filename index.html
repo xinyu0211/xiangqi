@@ -812,7 +812,7 @@ function renderControls(){
     if (sol){
       const v=sol.lines.length-1;
       $('solInfo').textContent = `主线 ${sol.lines[0].moves.length} 步` + (v ? `，${v} 个变着` : '');
-      $('solSrc').textContent = '解法据 xiangqiqipu.com' + (sol.fixed ? '；本局局面已按解法校正' : '');
+      $('solSrc').textContent = sol.fixed ? '本局局面已按解法校正' : '';
     } else { $('solInfo').textContent='本局暂无古谱解法'; $('solSrc').textContent=''; }
   }
   $('levelLabel').textContent = pending.mode==='puzzle' ? '黑方防守强度' : '电脑难度';
