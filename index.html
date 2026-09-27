@@ -1,0 +1,1080 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>中国象棋</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="中国象棋">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#D6DDD3">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="preload" href="mashanzheng.woff2" as="font" type="font/woff2" crossorigin>
+<style>
+@font-face{font-family:"Ma Shan Zheng";src:url(mashanzheng.woff2) format("woff2");font-display:block}
+:root{
+  --page:#D6DDD3; --ink:#1F2622; --muted:#56615A; --panel:#E7EBE4; --rule:rgba(31,38,34,.16);
+  --accent:#2F5D50; --accent-ink:#F1F4EF;
+  --red:#A8261B; --black:#1E2B2A;
+  --wood-a:#E9C88E; --wood-b:#D5AA68; --grid:#4A2E16; --frame:#6E4221;
+  --face:#F4E6C6; --face-hi:#FFF7DE; --edge:#B88F55;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --page:#141917; --ink:#E3E8E1; --muted:#9AA59D; --panel:#1D2320; --rule:rgba(227,232,225,.14);
+    --accent:#86B8A5; --accent-ink:#10231C;
+  }
+}
+:root[data-theme="dark"]{
+  --page:#141917; --ink:#E3E8E1; --muted:#9AA59D; --panel:#1D2320; --rule:rgba(227,232,225,.14);
+  --accent:#86B8A5; --accent-ink:#10231C;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:border-box}
+body{
+  margin:0; background:var(--page); color:var(--ink);
+  font-family:"PingFang SC","Hiragino Sans GB","Noto Sans SC","Microsoft YaHei",system-ui,sans-serif;
+  font-size:15px; line-height:1.6; -webkit-tap-highlight-color:transparent;
+}
+.app{max-width:1000px;margin:0 auto;padding:14px 10px 28px;display:grid;gap:14px}
+header{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;padding:0 4px}
+h1{
+  margin:0;font-family:"Ma Shan Zheng",KaiTi,STKaiti,"Kaiti SC",serif;font-weight:400;
+  font-size:clamp(34px,7vw,48px);line-height:1;letter-spacing:.06em;
+}
+header p{margin:0;color:var(--muted);font-size:14px}
+.play{display:grid;gap:10px;min-width:0}
+.status{display:flex;align-items:center;gap:10px;padding:0 4px;font-size:16px;min-height:28px}
+.turn-dot{width:16px;height:16px;border-radius:50%;border:2px solid var(--ink);flex:none}
+.turn-dot.r{background:var(--red);border-color:var(--red)}
+.turn-dot.b{background:var(--black);border-color:var(--black)}
+.status .alert{color:#C8321F;font-weight:700;margin-right:6px}
+:root[data-theme="dark"] .turn-dot.b{border-color:#9AA59D}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .turn-dot.b{border-color:#9AA59D}}
+
+.board-wrap{position:relative;width:100%;max-width:600px;margin:0 auto}
+svg#board{display:block;width:100%;height:auto;touch-action:manipulation;cursor:pointer;user-select:none;-webkit-user-select:none}
+.grid-line{stroke:var(--grid);stroke-width:1.3}
+.grid-outer{stroke:var(--grid);stroke-width:3;fill:none}
+.river{font-family:"Ma Shan Zheng",KaiTi,STKaiti,serif;font-size:34px;fill:var(--grid);opacity:.78;text-anchor:middle;dominant-baseline:central}
+.file-num{font-size:15px;fill:var(--grid);opacity:.75;text-anchor:middle;dominant-baseline:central;font-family:"PingFang SC","Noto Sans SC",sans-serif}
+.piece{transition:transform .28s cubic-bezier(.2,.7,.2,1)}
+.pc-body{transition:transform .15s ease;transform-box:fill-box;transform-origin:center}
+.pc-shadow{fill:rgba(60,32,8,.38)}
+.pc-face{fill:var(--face);stroke:var(--edge);stroke-width:1.6}
+.pc-ring{fill:none;stroke-width:1.7}
+.pc-char{font-family:"Ma Shan Zheng",KaiTi,STKaiti,"Kaiti SC",serif;font-size:36px;font-weight:700;text-anchor:middle;dominant-baseline:central;stroke-width:.8px;stroke-linejoin:round;paint-order:stroke}
+.red .pc-ring{stroke:var(--red)} .red .pc-char{fill:var(--red);stroke:var(--red)}
+.black .pc-ring{stroke:var(--black)} .black .pc-char{fill:var(--black);stroke:var(--black)}
+.selected .pc-body{transform:translateY(-4px) scale(1.07)}
+.selected .pc-face{fill:var(--face-hi)}
+.pc-alert{fill:none;stroke:#D7372A;stroke-width:3.5;opacity:0}
+.checked .pc-alert{opacity:1}
+.hint-dot{fill:#2F6B55;opacity:.8}
+.hint-cap{fill:none;stroke:#2F6B55;stroke-width:3.5;opacity:.9}
+.last-from{fill:none;stroke:#2F6B55;stroke-width:2;opacity:.55}
+.last-to{fill:none;stroke:#2F6B55;stroke-width:2.6;opacity:.8}
+
+.result{
+  position:absolute;inset:0;display:none;align-items:center;justify-content:center;
+}
+.result.show{display:flex}
+.result-card{
+  background:var(--panel);color:var(--ink);border:1px solid var(--rule);border-radius:14px;
+  padding:20px 26px;text-align:center;box-shadow:0 12px 40px rgba(20,14,6,.35);max-width:80%;
+}
+.result-card h2{margin:0 0 4px;font-family:"Ma Shan Zheng",KaiTi,STKaiti,serif;font-weight:400;font-size:40px;line-height:1.2}
+.result-card p{margin:0 0 14px;color:var(--muted)}
+
+.result-actions{display:flex;gap:8px;justify-content:center}
+.hint-from{fill:none;stroke:#C27C0E;stroke-width:3.5;stroke-dasharray:6 5}
+.hint-line{stroke:#C27C0E;stroke-width:4;stroke-linecap:round;opacity:.75}
+.hint-to{fill:#C27C0E;opacity:.9}
+.puzzle-head{padding:0 4px}
+.puzzle-head h2{margin:0;font-family:"Ma Shan Zheng",KaiTi,STKaiti,serif;font-weight:400;font-size:30px;line-height:1.25}
+.puzzle-head p{margin:2px 0 0;color:var(--muted);font-size:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.pz-solved{color:var(--accent);border:1px solid var(--accent);border-radius:999px;padding:0 8px;font-size:12px;line-height:1.6}
+select{
+  font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--rule);border-radius:10px;
+  padding:9px 10px;min-height:44px;width:100%;max-width:100%;
+}
+select:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.pz-nav{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.panel{display:grid;gap:16px;align-content:start;padding:0 4px;min-width:0}
+.actions{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+button{
+  font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--rule);
+  border-radius:10px;padding:10px 12px;cursor:pointer;min-height:44px;
+}
+button:hover{border-color:var(--accent)}
+button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+button:disabled{opacity:.45;cursor:not-allowed}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+.setting{display:grid;gap:6px}
+.setting .label{font-size:13px;color:var(--muted)}
+.seg{display:flex;background:var(--panel);border:1px solid var(--rule);border-radius:10px;padding:3px;gap:3px}
+.seg button{flex:1;border:0;background:transparent;border-radius:8px;min-height:38px;padding:6px 8px}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);font-weight:600}
+.note{font-size:13px;color:var(--muted);min-height:1em;margin:-8px 0 0}
+.record{border-top:1px solid var(--rule);padding-top:10px}
+.record h2{font-size:14px;font-weight:600;margin:0 0 6px;color:var(--muted)}
+.moves{
+  list-style:none;margin:0;padding:0;max-height:260px;overflow-y:auto;
+  font-family:KaiTi,STKaiti,"Kaiti SC","Songti SC","Noto Serif SC",serif;font-size:18px;
+}
+.moves li{display:grid;grid-template-columns:2.2em 1fr 1fr;gap:6px;padding:2px 0}
+.moves .n{color:var(--muted);font-family:system-ui,sans-serif;font-size:13px;align-self:center}
+.moves .rm{color:var(--red)}
+:root[data-theme="dark"] .moves .rm{color:#E0705F}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .moves .rm{color:#E0705F}}
+.moves .empty{color:var(--muted);font-family:inherit;font-size:14px;display:block}
+
+.sol-bar{display:grid;gap:10px;width:100%;max-width:600px;margin:0 auto}
+.sol-bar[hidden]{display:none}
+.seg[hidden]{display:none}
+.step-nav{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.step-nav button{padding:8px 4px}
+.branch-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px;color:var(--muted)}
+.branch-row:empty{display:none}
+.chip{min-height:38px;padding:4px 12px;border-radius:999px;font-family:KaiTi,STKaiti,"Kaiti SC","Songti SC","Noto Serif SC",serif;font-size:17px}
+.chip[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.book-msg{background:var(--panel);border:1px solid var(--rule);border-left:4px solid #C27C0E;border-radius:10px;padding:10px 12px}
+.book-msg p{margin:0}
+.book-msg b{font-family:KaiTi,STKaiti,"Kaiti SC","Songti SC","Noto Serif SC",serif;font-size:18px;font-weight:400;color:var(--red)}
+.book-actions{display:flex;gap:8px;flex-wrap:wrap}
+.src{font-size:12px;color:var(--muted);margin:0}
+.moves{position:relative}
+.moves .mv{font:inherit;background:none;border:0;border-radius:6px;padding:0 5px;min-height:0;justify-self:start;cursor:pointer;line-height:1.5}
+.moves .mv.future{opacity:.42}
+.moves .mv.cur{background:var(--accent);color:var(--accent-ink);opacity:1}
+.moves .mv sup{font-family:system-ui,sans-serif;font-size:11px;color:#C27C0E;margin-left:2px}
+.moves .mv.cur sup{color:inherit}
+
+@media (min-width:880px){
+  .app{grid-template-columns:minmax(0,600px) minmax(260px,1fr);padding:24px 20px 40px;column-gap:28px}
+  header{grid-column:1/-1}
+  .panel{padding-top:38px}
+}
+@media (prefers-reduced-motion: reduce){.piece,.pc-body{transition:none}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>中国象棋</h1>
+    <p>点选己方棋子，再点落点。可对弈，也可练《适情雅趣》全部 551 局古谱，并按古谱解法练习或看答案。</p>
+  </header>
+
+  <section class="play">
+    <div class="puzzle-head" id="puzzleHead" hidden>
+      <h2 id="pzTitle"></h2>
+      <p><span id="pzGoal"></span><span class="pz-solved" id="pzSolved" hidden>已破解</span></p>
+    </div>
+    <div class="status" aria-live="polite"><span class="turn-dot r" id="turnDot"></span><span id="status"></span></div>
+    <div class="board-wrap">
+      <svg id="board" viewBox="0 0 608 668" role="img" aria-label="象棋棋盘">
+        <defs>
+          <linearGradient id="wood" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="var(--wood-a)"/>
+            <stop offset="1" stop-color="var(--wood-b)"/>
+          </linearGradient>
+        </defs>
+        <g id="staticLayer"></g>
+        <g id="numLayer"></g>
+        <g id="lastLayer"></g>
+        <g id="pieceLayer"></g>
+        <g id="hintLayer" pointer-events="none"></g>
+      </svg>
+      <div class="result" id="result">
+        <div class="result-card">
+          <h2 id="resultTitle"></h2>
+          <p id="resultText"></p>
+          <div class="result-actions">
+            <button id="viewBtn">看棋盘</button>
+            <button class="primary" id="againBtn">再来一局</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="sol-bar" id="answerBar" hidden>
+      <div class="step-nav">
+        <button id="stFirst">开头</button>
+        <button id="stPrev">上一步</button>
+        <button id="stPlay" class="primary">播放</button>
+        <button id="stNext">下一步</button>
+        <button id="stLast">末尾</button>
+      </div>
+      <div class="branch-row" id="branchRow"></div>
+    </div>
+    <div class="sol-bar book-msg" id="bookBar" hidden>
+      <p id="bookMsg"></p>
+      <div class="book-actions">
+        <button id="bookUndo">撤回这步</button>
+        <button class="primary" id="bookAI">继续和电脑下</button>
+      </div>
+    </div>
+  </section>
+
+  <aside class="panel">
+    <div class="actions">
+      <button id="undoBtn">悔棋</button>
+      <button id="flipBtn">翻转棋盘</button>
+      <button id="newBtn" class="primary">新局</button>
+    </div>
+    <div class="setting">
+      <span class="label">玩法</span>
+      <div class="seg" data-key="mode">
+        <button data-v="ai">对弈电脑</button>
+        <button data-v="pvp">双人同屏</button>
+        <button data-v="puzzle">古谱残局</button>
+      </div>
+    </div>
+    <div class="setting" id="sideRow">
+      <span class="label">执子</span>
+      <div class="seg" data-key="human">
+        <button data-v="r">红方（先走）</button>
+        <button data-v="b">黑方</button>
+      </div>
+    </div>
+    <div class="setting" id="levelRow">
+      <span class="label" id="levelLabel">电脑难度</span>
+      <div class="seg" data-key="level">
+        <button data-v="1">入门</button>
+        <button data-v="2">普通</button>
+        <button data-v="3">高手</button>
+      </div>
+    </div>
+    <div class="setting" id="puzzleRow">
+      <label class="label" for="pzSelect">《适情雅趣》选局　<span id="pzProgress"></span></label>
+      <select id="pzSelect"></select>
+      <div class="pz-nav">
+        <button id="pzPrev">上一局</button>
+        <button id="pzHint">提示一步</button>
+        <button id="pzNext">下一局</button>
+      </div>
+    </div>
+    <div class="setting" id="solRow">
+      <span class="label">古谱解法　<span id="solInfo"></span></span>
+      <div class="seg" data-key="pzMode" id="pzModeSeg">
+        <button data-v="free">自己解</button>
+        <button data-v="book">按谱练习</button>
+        <button data-v="answer">看答案</button>
+      </div>
+      <p class="src" id="solSrc"></p>
+    </div>
+    <p class="note" id="note"></p>
+    <div class="record">
+      <h2 id="recTitle">棋谱</h2>
+      <ol class="moves" id="moves"></ol>
+    </div>
+  </aside>
+</div>
+
+<script>
+(function(){
+"use strict";
+/* ================= 规则引擎 ================= */
+const NAME_P = { r:{K:'帅',A:'仕',B:'相',N:'马',R:'车',C:'炮',P:'兵'}, b:{K:'将',A:'士',B:'象',N:'马',R:'车',C:'炮',P:'卒'} };
+const CN = ['','一','二','三','四','五','六','七','八','九'];
+const D4 = [[1,0],[-1,0],[0,1],[0,-1]];
+const DG = [[1,1],[1,-1],[-1,1],[-1,-1]];
+const NJ = [[-2,-1,-1,0],[-2,1,-1,0],[2,-1,1,0],[2,1,1,0],[-1,-2,0,-1],[1,-2,0,-1],[-1,2,0,1],[1,2,0,1]];
+const opp = s => s==='r'?'b':'r';
+
+function initBoard(){
+  const b = new Array(90).fill(null); let id = 0;
+  const back = ['R','N','B','A','K','A','B','N','R'];
+  for (let c=0;c<9;c++){ b[c]={s:'b',t:back[c],id:id++}; b[81+c]={s:'r',t:back[c],id:id++}; }
+  [1,7].forEach(c=>{ b[18+c]={s:'b',t:'C',id:id++}; b[63+c]={s:'r',t:'C',id:id++}; });
+  [0,2,4,6,8].forEach(c=>{ b[27+c]={s:'b',t:'P',id:id++}; b[54+c]={s:'r',t:'P',id:id++}; });
+  return b;
+}
+function inPalace(s,r,c){ return c>=3 && c<=5 && (s==='r' ? r>=7 && r<=9 : r>=0 && r<=2); }
+
+// 伪合法着法（不检查自己被将），着法编码 from*128+to
+function genMoves(b, side, capOnly){
+  const out = [];
+  for (let i=0;i<90;i++){
+    const p = b[i]; if (!p || p.s!==side) continue;
+    const r = (i/9)|0, c = i%9;
+    const add = (r2,c2)=>{
+      if (r2<0||r2>9||c2<0||c2>8) return;
+      const q = b[r2*9+c2];
+      if (q && q.s===side) return;
+      if (capOnly && !q) return;
+      out.push(i*128 + r2*9 + c2);
+    };
+    switch (p.t){
+      case 'K': {
+        for (const [dr,dc] of D4){ const r2=r+dr, c2=c+dc; if (inPalace(side,r2,c2)) add(r2,c2); }
+        const dr = side==='r' ? -1 : 1;           // 将帅对面
+        for (let r2=r+dr; r2>=0 && r2<=9; r2+=dr){
+          const q = b[r2*9+c];
+          if (q){ if (q.t==='K') out.push(i*128 + r2*9 + c); break; }
+        }
+        break;
+      }
+      case 'A':
+        for (const [dr,dc] of DG){ const r2=r+dr, c2=c+dc; if (inPalace(side,r2,c2)) add(r2,c2); }
+        break;
+      case 'B':
+        for (const [dr,dc] of DG){
+          const r2=r+2*dr, c2=c+2*dc;
+          if (r2<0||r2>9||c2<0||c2>8) continue;
+          if (side==='r' ? r2<5 : r2>4) continue;   // 不能过河
+          if (b[(r+dr)*9 + c+dc]) continue;         // 塞象眼
+          add(r2,c2);
+        }
+        break;
+      case 'N':
+        for (const [dr,dc,lr,lc] of NJ){
+          const r2=r+dr, c2=c+dc;
+          if (r2<0||r2>9||c2<0||c2>8) continue;
+          if (b[(r+lr)*9 + c+lc]) continue;         // 蹩马腿
+          add(r2,c2);
+        }
+        break;
+      case 'R':
+        for (const [dr,dc] of D4){
+          let r2=r+dr, c2=c+dc;
+          while (r2>=0&&r2<=9&&c2>=0&&c2<=8){
+            const q=b[r2*9+c2];
+            if (!q){ if(!capOnly) out.push(i*128+r2*9+c2); }
+            else { if (q.s!==side) out.push(i*128+r2*9+c2); break; }
+            r2+=dr; c2+=dc;
+          }
+        }
+        break;
+      case 'C':
+        for (const [dr,dc] of D4){
+          let r2=r+dr, c2=c+dc, screen=false;
+          while (r2>=0&&r2<=9&&c2>=0&&c2<=8){
+            const q=b[r2*9+c2];
+            if (!screen){
+              if (!q){ if(!capOnly) out.push(i*128+r2*9+c2); }
+              else screen=true;
+            } else if (q){
+              if (q.s!==side) out.push(i*128+r2*9+c2);
+              break;
+            }
+            r2+=dr; c2+=dc;
+          }
+        }
+        break;
+      case 'P': {
+        const f = side==='r' ? -1 : 1;
+        add(r+f, c);
+        if (side==='r' ? r<=4 : r>=5){ add(r,c-1); add(r,c+1); }
+        break;
+      }
+    }
+  }
+  return out;
+}
+function makeMove(b,m){ const f=m>>7, t=m&127, cap=b[t]; b[t]=b[f]; b[f]=null; return cap; }
+function unmakeMove(b,m,cap){ const f=m>>7, t=m&127; b[f]=b[t]; b[t]=cap; }
+function findKing(b,s){ for (let i=0;i<90;i++){ const p=b[i]; if (p&&p.t==='K'&&p.s===s) return i; } return -1; }
+function inCheck(b,s){
+  const k=findKing(b,s); if (k<0) return true;
+  const ms=genMoves(b,opp(s),true);
+  for (const m of ms) if ((m&127)===k) return true;
+  return false;
+}
+function legalMoves(b,s){
+  const res=[];
+  for (const m of genMoves(b,s,false)){
+    const cap=makeMove(b,m);
+    if (!inCheck(b,s)) res.push(m);
+    unmakeMove(b,m,cap);
+  }
+  return res;
+}
+
+/* ================= 记谱 ================= */
+function fileNum(s,c){ return s==='r' ? 9-c : c+1; }
+function numStr(s,n){ return s==='r' ? CN[n] : String(n); }
+function notation(b,m){
+  const f=m>>7, t=m&127, p=b[f], s=p.s;
+  const r1=(f/9)|0, c1=f%9, r2=(t/9)|0, c2=t%9;
+  const nm = NAME_P[s][p.t];
+  let head = nm + numStr(s, fileNum(s,c1));
+  if (p.t!=='K'){
+    const same=[];
+    for (let r=0;r<10;r++){ const q=b[r*9+c1]; if (q&&q.s===s&&q.t===p.t) same.push(r); }
+    if (same.length>=2){
+      same.sort((a,z)=> s==='r' ? a-z : z-a);
+      const k = same.indexOf(r1);
+      const tag = same.length===2 ? ['前','后'][k] : same.length===3 ? ['前','中','后'][k] : ['一','二','三','四','五'][k];
+      head = tag + nm;
+    }
+  }
+  let dir, n;
+  if (r1===r2){ dir='平'; n=fileNum(s,c2); }
+  else {
+    const fwd = s==='r' ? r1-r2 : r2-r1;
+    dir = fwd>0 ? '进' : '退';
+    n = (p.t==='N'||p.t==='B'||p.t==='A') ? fileNum(s,c2) : Math.abs(r2-r1);
+  }
+  return head + dir + numStr(s,n);
+}
+
+/* ================= 电脑 AI ================= */
+const VAL = {K:0,A:200,B:200,N:400,R:900,C:450,P:100};
+const OV  = {K:10000,R:900,C:450,N:400,A:200,B:200,P:100};
+const MATE = 100000, INF = 1e9, ABORT = {};
+const LEVELS = { 1:{depth:1,time:500,noise:90}, 2:{depth:3,time:1500,noise:12}, 3:{depth:8,time:3000,noise:0} };
+let nodes=0, deadline=0, killers=[], hist=new Int32Array(90*128);
+
+function evaluate(b){
+  let sc=0;
+  for (let i=0;i<90;i++){
+    const p=b[i]; if (!p) continue;
+    const r=(i/9)|0, c=i%9, adv = p.s==='r' ? 9-r : r;
+    let v = VAL[p.t];
+    switch (p.t){
+      case 'P':
+        if (adv>=5) v += 70 + (adv<=8 ? (adv-5)*14 : -15) + (4-Math.abs(c-4))*7;
+        else if (c===4) v += 10;
+        break;
+      case 'N': v += 24 - 6*Math.abs(c-4) + Math.min(adv,7)*6 - (adv===0?18:0); break;
+      case 'R': v += Math.min(adv,7)*4 + ((c===0||c===8)&&adv===0 ? -12 : 4); break;
+      case 'C': v += (c===4?18:0) + (adv>=2&&adv<=6?6:0); break;
+    }
+    sc += p.s==='r' ? v : -v;
+  }
+  return sc;
+}
+function orderMoves(b,ms,ply){
+  const k = killers[ply] || [];
+  const keys = new Array(ms.length);
+  for (let j=0;j<ms.length;j++){
+    const m=ms[j], v=b[m&127];
+    keys[j] = v ? 2e6 + OV[v.t]*16 - OV[b[m>>7].t]
+            : m===k[0] ? 1.5e6 : m===k[1] ? 1.4e6 : Math.min(hist[m],1e6);
+  }
+  const ix = ms.map((_,j)=>j).sort((a,z)=>keys[z]-keys[a]);
+  const cp = ms.slice(); for (let j=0;j<ms.length;j++) ms[j]=cp[ix[j]];
+}
+function qsearch(b,side,alpha,beta,qd){
+  if ((++nodes & 2047)===0 && Date.now()>deadline) throw ABORT;
+  const stand = (side==='r'?1:-1)*evaluate(b);
+  if (stand>=beta) return stand;
+  if (stand>alpha) alpha=stand;
+  if (qd<=0) return stand;
+  const ms=genMoves(b,side,true); orderMoves(b,ms,63);
+  for (const m of ms){
+    if (b[m&127].t==='K') return MATE;
+    const cap=makeMove(b,m);
+    const sc=-qsearch(b,opp(side),-beta,-alpha,qd-1);
+    unmakeMove(b,m,cap);
+    if (sc>=beta) return sc;
+    if (sc>alpha) alpha=sc;
+  }
+  return alpha;
+}
+function search(b,side,depth,alpha,beta,ply){
+  if (depth<=0){
+    if (ply<12 && inCheck(b,side)) depth=1;   // 被将军时延伸一步
+    else return qsearch(b,side,alpha,beta,6);
+  }
+  if ((++nodes & 2047)===0 && Date.now()>deadline) throw ABORT;
+  const ms=genMoves(b,side,false); orderMoves(b,ms,ply);
+  let best = -MATE+ply;
+  for (const m of ms){
+    const tgt=b[m&127];
+    if (tgt && tgt.t==='K') return MATE-ply;
+    const cap=makeMove(b,m);
+    const sc=-search(b,opp(side),depth-1,-beta,-alpha,ply+1);
+    unmakeMove(b,m,cap);
+    if (sc>best) best=sc;
+    if (sc>alpha) alpha=sc;
+    if (alpha>=beta){
+      if (!cap){
+        const k = killers[ply] || (killers[ply]=[0,0]);
+        if (k[0]!==m){ k[1]=k[0]; k[0]=m; }
+        hist[m] += depth*depth;
+      }
+      break;
+    }
+  }
+  return best;
+}
+function think(b0,side,level){
+  const cfg = LEVELS[level];
+  const b = b0.slice();
+  const legal = legalMoves(b,side);
+  if (!legal.length) return null;
+  if (legal.length===1) return legal[0];
+  deadline = Date.now()+cfg.time; nodes=0; killers=[]; hist.fill(0);
+  orderMoves(b,legal,0);
+  let best = legal[0];
+  for (let d=1; d<=cfg.depth; d++){
+    let alpha=-INF, iterBest=null, iterScore=-INF;
+    try {
+      for (const m of legal){
+        const cap=makeMove(b,m);
+        let sc = -search(b,opp(side),d-1,-INF, cfg.noise ? INF : -alpha, 1);
+        unmakeMove(b,m,cap);
+        if (cfg.noise) sc += Math.random()*cfg.noise;
+        if (sc>iterScore){ iterScore=sc; iterBest=m; }
+        if (!cfg.noise && sc>alpha) alpha=sc;
+      }
+    } catch(e){
+      if (e!==ABORT) throw e;
+      if (d===1 && iterBest!=null) best=iterBest;
+      break;
+    }
+    best = iterBest;
+    legal.splice(legal.indexOf(best),1); legal.unshift(best);
+    if (iterScore > MATE-100) break;
+    if (Date.now() > deadline - cfg.time*0.4) break;  // 剩余时间不够再深一层
+  }
+  return best;
+}
+
+/* ================= 古谱数据：《适情雅趣》551 局 ================= */
+const PUZZLES = [[1,"气吞关右","","2baka3/3P3N1/bN7/7nc/9/4C1P2/P5n1P/B3R3B/4Apr2/2RAK3c"],[2,"马蹀阏氏","","C3kab2/4a4/n3c1n2/3Np1p2/1R4P2/1R7/4P4/4B4/1pCp1p3/1crAK1N2"],[3,"羝羊触藩","","1rbckaP2/3PaP1r1/1P2b4/1R7/Nn7/CRBp1n3/4C4/9/4p1p2/1c3K3"],[4,"良将安边","","2bk1ab2/4a4/9/p1P6/3NC4/4Pp3/P5n2/4B3N/4Ar3/1RBAK2cr"],[5,"淮阴遇汉","","2ba1k3/4a1R2/9/1cp2N3/1Nb6/3n2P2/4C4/3AB4/3r1p1n1/2R1KAr1c"],[6,"蝇垂骥尾","","2b1kabn1/4aR3/3R2N2/4p1p2/5P3/4P4/3N2Pr1/4C1n2/3pAr3/4K3c"],[7,"春雷惊蛰","","3a2b2/1P1k5/2Pab4/7RC/9/9/2P2c3/2NA5/3KAr3/cnn1r4"],[8,"珠藏韫柜","","C1bac1RN1/r2Rak3/7n1/1rP6/2N1P1p2/9/9/2n6/5p3/4Kc3"],[9,"神龟出洛","","3a1k3/1C7/c4a3/8N/3P5/9/8C/B8/r2pnpp2/4K1cRR"],[10,"鸳鸯戏水","","4kab1C/4a4/9/1R7/4P1N2/2N3B2/1n5r1/4n4/4A4/c1BAK4"],[11,"群鼠争穴","","3k2b2/4P4/crR1b2Rc/9/9/9/9/1C3N1C1/4p1r2/2p2K3"],[12,"颠猿饮涧","","1C2kab2/rN2a2R1/2r1c3b/9/9/5R3/9/7C1/9/3K5"],[13,"目视横流","","4k4/3P2P2/b2N2R2/7r1/2b6/9/9/3n5/4p3r/2R2K3"],[14,"独鹿鸣泽","","C3k4/4a1r2/5a3/1N7/1Cp6/1R7/9/3p5/4p3r/3K5"],[15,"妙振兵铃","","r1b1k4/c1PPaRc2/r2ab3n/4C4/7RC/9/9/9/4p4/3K5"],[16,"退思补过","","3aka3/3P1n3/RR2b4/4p4/1Cb4C1/6B1r/9/4p4/3pp4/5K3"],[17,"退闲式步","","C3ka3/4aP1r1/nR2c4/p8/6b2/9/9/2C6/3p1p3/c1rAK4"],[18,"播弄造化","","3a1kbn1/4P4/1c2n1r2/4p4/9/CC5pp/9/9/r1p1p4/3K3RR"],[19,"遁世不见","","3k1a3/4a4/2n6/NP1C1P3/9/C8/9/3ABcr1B/3pAp1n1/4K3c"],[20,"推强扶弱","","2bak2r1/4aP2R/2R1b4/6p1p/1Np6/P1C6/9/9/3pr4/5K2c"],[21,"尽善克终","","3ak4/3RaR3/4b3N/6N2/2b6/9/3pP4/B3C1n1B/2rp2r2/4K4"],[22,"及第思乡","","r1N3b2/1c1kaP3/3ab4/8N/9/9/9/4BA3/5p3/C1R1K1Rrc"],[23,"沧海遗珠","","2bnk4/9/b8/2PRp1RN1/9/9/9/1C2B1r2/4p1r2/c1pC1K2c"],[24,"垂缰救主","","2bak4/4a4/9/4pNpNn/6b2/9/4P4/3p5/crR1K3C/2nr2B2"],[25,"患在几席","","2Rakc3/4aR3/4b1n2/4C4/6b2/2B6/4c4/2n1B3C/1r2A1p2/4KA3"],[26,"结草衔环","","2Pak3C/3Pa4/b5C1N/4p1p2/6b2/5N3/4c4/6n2/5p1r1/1r1cK4"],[27,"藕断丝牵","","2bP1k2r/1nn1P4/3cbc3/9/2p3P1p/7RC/9/4p4/3p1R3/2pCK4"],[28,"计罗并照","","3ak1b2/4aP1R1/4b3n/3N3N1/3r5/2R5r/9/4BC1C1/1n2p1p2/c4K3"],[29,"四面楚歌","","2b1R1Nr1/1Nr2k3/9/C2R1P1n1/2bCp1P2/5pc2/9/5n3/2p1p4/3K5"],[30,"国庶兵强","","4kaPP1/c2Pa2nR/4b1P1r/6n2/6bN1/9/4C1R2/9/1r1p1p3/4K4"],[31,"兵贵拙速","","4k1br1/r3aPRN1/2Rab1P1n/8p/6P2/8C/9/9/3p1p3/4K2c1"],[32,"士马如云","","2bakab2/n6P1/9/1R7/4N4/1C7/9/3ABA3/1N1p1p3/2p1KCrc1"],[33,"计定千里","","3a1k2C/2R1a2R1/4b3N/8p/2b6/7n1/9/4C3B/3rAr1p1/4KAB1c"],[34,"忙里偷闲","","2b1kaR2/4aR3/3nbP3/3Np4/9/9/4P4/1C2C4/3pAp2r/4KAB1c"],[35,"龙翻潭底","","1Cbaka3/1R7/2n1b4/2N1p4/9/3R5/4P1r2/4C3B/4Ar1n1/2BAK3c"],[36,"鹤鸣九皋","","4k1b2/4a3n/1C1ab1R2/1NR6/2r1C4/9/9/4BA3/1n1p1p3/c1rAK1N2"],[37,"攻敌安己","","CR3a3/3ka4/1R2b1P2/4C4/N1b6/9/6P2/4B1n2/2cpAp2r/4KAB1c"],[38,"百计无由","","3ak1bR1/4aP2r/9/2p3pC1/5Pc2/1RB6/7p1/9/5r3/4K4"],[39,"博望烧屯","","2bak1b2/4aR2C/6N1n/9/9/9/5c3/4BC3/3p1r1n1/4K2c1"],[40,"决策九重","","2b2a1n1/3k3C1/2Pa5/8C/6b2/9/4c4/2n1R1p2/2r1R1r2/4K4"],[41,"镇压远庭","","2bak1b2/3Ra4/2N6/2p6/5R3/2C6/9/9/1r1pA4/4KA1rc"],[42,"参辰卯酉","","3ak4/2n1aP3/2P6/6p2/9/6P2/2P6/C1N1BK3/6p2/R1B1r4"],[43,"精忠报国","","C4kbN1/R2Pa4/4ca3/4rNR2/6b2/6c2/9/4C4/4p3r/5K3"],[44,"近悦远来","","4ka3/3P1R3/5P2b/6P1N/1R4b1c/2n6/8C/5A3/4AK3/1r4r2"],[45,"遇水叠桥","","2bak1r2/4aP3/4b4/7N1/9/5C1R1/4p1p2/1cn6/1C1r5/c3K4"],[46,"远交近攻","","3k5/4aN3/2R2a3/5n3/2R6/9/1pP6/B1n1BA1N1/1r2A1p2/c4K3"],[47,"守边告归","","1R3a3/2N1ak3/4P4/C2N4p/9/9/4cp3/4B1n1B/4A3r/3AK4"],[48,"卧薪尝胆","","3k1a1n1/4aR3/4b1C2/4C1R2/2b1N4/2B6/2P6/2nrB4/5p3/4K4"],[49,"独步出营","","2b2a3/1P1k1P3/3a5/9/n1b6/9/9/4RA3/2C1Nr3/2p1KA1rc"],[50,"秦鹿方走","","3N3r1/3R4C/3aka3/6pN1/9/9/4n4/2C6/4p4/5Kc1r"],[51,"下车伏谒","","R2akab2/3n3P1/1NC1b4/5R3/2p3p2/9/9/5p3/4r3r/5K3"],[52,"担雪填井","","3ak3r/4a1R2/b1C1bc3/1N2C3N/9/3p5/2n6/3K5/9/r8"],[53,"开窗邀月","","1n1k1a3/R8/b2ab4/2R6/9/6C2/9/4C4/3pArn1c/4K4"],[54,"五虎靠山","","C7r/3kaP3/b1c1ba3/1R3N3/9/C8/9/9/4p1r2/5K3"],[55,"背水战胜","","3R4C/3P1P3/4kan2/9/C4PbN1/1n3N3/9/5p3/r3p4/3K5"],[56,"百川汇海","","5k3/3PP4/b2Pb4/5P1C1/2c6/3p5/2r6/6p2/4r4/CR1K5"],[57,"放弥六合","","3ack3/1NR1a1P2/3n2R2/9/2C6/9/9/9/1r2p2r1/3K5"],[58,"中外二圣","","4kab1r/4a4/4b4/CR2R4/8r/2C6/9/9/c3p4/5K3"],[59,"变现出没","","2b1ka1r1/3Pa4/5Rc2/5Nr2/9/9/9/7C1/C2p5/4K4"],[60,"虎兕出匣","","4k3C/4a4/5P2N/8P/6p2/9/9/B2A3p1/1r1pA4/c3K4"],[61,"群虎争餐","","2bk1a3/1R2a2N1/rCc1b4/9/9/9/9/4C2R1/3r1p3/4K4"],[62,"控告无门","","3ak4/4a4/4cc3/1N1r2CRC/9/9/9/3n1R3/r3p4/3K5"],[63,"头辆舆轮","","3akarr1/1NC2P2C/9/9/R8/9/6p2/4B4/2n1p4/5K3"],[64,"倒转干戈","","2b2k3/C3P4/1P2b4/p8/9/9/P7r/c3K4/3C1pp2/3R4c"],[65,"推窗望月","","2ba1k3/4a4/n3N4/9/9/9/9/3RB1r2/2p2r3/3AK2R1"],[66,"见危致命","","1rbak3r/1N1Ra4/cR2b1N2/9/9/9/9/9/5p3/4K4"],[67,"凫罗鱼网","","1n1ck3C/2PPa1R2/5a3/9/8N/9/9/3n5/4p2r1/5K3"],[68,"鸿门碎斗","","2Ck1a3/2R1aR3/9/5N3/r8/r8/9/3C5/4p1n2/3K5"],[69,"举趾触罝","","C3kC3/2PRa4/1n5P1/9/9/1N5N1/9/3p5/4r2r1/3K5"],[70,"鸢飞泪天","","4k3C/5N1rC/5c3/4p4/4N4/9/9/6n2/2r2p3/3RK4"],[71,"触目惊心","","C3ka1r1/3Ra4/9/5NR2/9/9/9/9/r2p1pc2/4K4"],[72,"骏骑追风","","4kab1N/4a3C/4b4/N8/9/4C4/9/5p3/2n1p4/5K3"],[73,"鱼跃于渊","","4k4/1R5n1/1N7/9/3P1N3/3r1R3/9/4p4/3r1p3/1c2K4"],[74,"登高履险","","2R6/C2Rak3/4b3b/9/1r7/4P4/3p5/9/4rp3/3K5"],[75,"豪帅心服","","4rc3/4ak3/9/9/9/9/9/2R6/3pA4/cr1AKC3"],[76,"莺慵蝶懒","","3a1a3/9/3k5/2P6/3P5/3N2C1C/9/1c3p3/4p4/3n1K3"],[77,"双蝶翻风","","4ka1c1/9/3a5/9/4c1r1r/9/1RR6/9/3p1p3/C3K4"],[78,"翻江搅海","","1rC2k3/9/n1R6/9/4N4/9/R3c4/4C4/4rn3/3K5"],[79,"四七并列","","C3ka3/4a2r1/N3b4/3C5/3N5/9/9/5p3/4p4/5K3"],[80,"士卒星散","","1r3a3/9/3ak4/5PR2/9/6C2/9/3pp4/3pp4/5K3"],[81,"寻踪觅迹","","1rP1k2n1/3R1N3/9/6N2/9/C8/9/5p3/4p4/c4K3"],[82,"祸不单行","","4k4/4a4/2P5n/5N3/9/5R3/9/9/2p2p2r/C3K4"],[83,"沉鱼落雁","","2bk5/1R5N1/9/9/9/9/9/5Cr2/r2p1p3/4K2R1"],[84,"双蜓点水","","1C3k3/1N2P4/1nN1b4/9/9/9/9/4p4/3p1p3/4K4"],[85,"骥不称力","","3ak3C/4aP2n/4R3N/8N/9/9/9/9/2rp1p3/4K4"],[86,"运筹决胜","","4k4/5P3/3P5/9/6b2/9/9/2p3p2/4AK1nr/3A1C3"],[87,"开渠引水","","3a3R1/5kC2/P1P6/9/9/1p7/1r7/3R5/5r3/3K5"],[88,"边卒成功","","4k4/C4R3/9/9/9/5R2P/4r4/4B3B/4p2r1/5K3"],[89,"七雄争霸","","2bak1b2/1n3P3/3a5/4p1p1N/6P1C/2R6/C1R1Pp1n1/3A5/3K2crc/3Ar4"],[90,"骅骝争先","","3aka3/1R1N5/1c2b1c2/1Np1p1p2/6n2/C6R1/2P1P4/2n1C4/4Ap2r/r2AK4"],[91,"六国抗秦","","2b1kaR2/3Ra2n1/1n2b4/5N3/2p3p2/1NB3C2/9/4B4/1r1p1r3/c3KC3"],[92,"五丁凿路","","2bak4/C2Ra4/N3b3R/1C5n1/9/2Bn5/9/B8/c1rp1p3/4Kc3"],[93,"鱼骇月钩","","3k2b1r/C4R3/P3b4/n2c1R3/9/1N7/9/4BA3/3p1p3/c1BAK4"],[94,"负笈追师","","2baka3/1R7/4b2nn/4R2CN/4N4/9/9/5p3/2rc4r/5K3"],[95,"英雄贯斗","","9/1n2ak3/5aP2/3N5/6b2/5r3/1C7/4R1p2/1p3r1p1/1C2K2c1"],[96,"勇退急流","","3akc3/4a4/4b1n2/C2RR2N1/4C4/5r3/9/3pB2r1/4p4/3K5"],[97,"敌居万人","","4k3N/3Pn4/4b4/c1p3n1R/4P3r/9/5R3/5C3/2r1p4/5K3"],[98,"姜公钓渭","","4ka3/4aN3/9/RC7/2b2Pb2/9/9/4pp3/3nr3r/5K3"],[99,"偷营劫寨","","c2a1k3/3Ra4/4c1P2/7R1/9/9/9/1C2B4/1r7/2BK5"],[100,"飞黄结路","","2r6/4akN2/C3P2c1/1C4P2/7r1/8R/9/5p3/4p4/5K3"],[101,"震惊百里","","R1bak2CR/5P3/9/9/9/1rB6/9/9/4p3r/5KB2"],[102,"金门待漏","","3ak4/R3a1P1R/b3b4/1C7/4c4/9/9/9/2r3r2/4K4"],[103,"双鹭窥鱼","","3ak3N/4aP3/8R/1rr5N/9/9/9/9/5p3/4K4"],[104,"径行自遂","","6b2/1N3k2C/5a3/3R5/9/R8/9/4c1n2/3p5/3AKAr1c"],[105,"战如烈火","","2b1ka3/4a3c/4b4/6n2/7RN/9/9/3CCR3/2rp1p3/4KAr1c"],[106,"兵马出塞","","2bak3r/3Ra4/4b4/6P2/7n1/2R3BN1/9/2n1C4/1r7/c3K3C"],[107,"丹山起凤","","1R1c1ab2/5k3/3r1a3/3C5/6b1N/3R5/9/3AB4/2p1p4/3K1N1rc"],[108,"争舟走渡","","2bak4/4aPP2/4b4/3N5/2r1C4/9/9/C2R2nr1/4Ap3/3AK3c"],[109,"欲罢不能","","2na1kb1R/2R6/4ba3/4C4/7r1/2C6/4c3P/4B4/4A3p/3AK3c"],[110,"料事多中","","3akaP2/9/4bR3/4p3C/7N1/9/3p5/4B4/3rApp2/c1NAK4"],[111,"兴戎出好","","2b1ka3/3Ra4/1c2b3c/N8/R8/6B2/4C1r2/C8/4Ap1n1/3AK4"],[112,"飞鲸吞钓","","2bak4/C3a2NR/4b4/9/6p2/1C2c4/9/4B4/1r2A1c2/3RKAr2"],[113,"威镇四海","","2b2k3/1R2a1P2/3a5/4p1N2/6b2/9/3nP4/4C1C2/3rAp3/c1nAK4"],[114,"践履笃实","","2bak2r1/C3a4/1N2b3c/4p2N1/9/2R6/9/2n6/3pA4/c1rAK3R"],[115,"耕莘待聘","","4k4/3PaR3/4ba3/2NN5/2p1r1b2/9/9/4C4/1nrpA4/c3KAR2"],[116,"明皇游宫","","2b1ka3/4a4/b6c1/7N1/2P1p4/1CR1C4/2P6/2n1p1nr1/8R/1rB1K4"],[117,"曲突徙薪","","2b1ka1r1/3Ra4/3Pb4/9/9/1R7/2Pnc4/1C1CB3B/4Ap3/3AK3c"],[118,"多士莫及","","1C3a3/3k4C/2R2a3/2p1pPN2/9/9/2P5P/1cn6/2p2pp2/4K4"],[119,"力敌万人","","4k1C2/3Pa2R1/4baN2/n8/9/9/2p6/3C5/4p1r1r/R4K3"],[120,"龟玉毁椟","","R2rk4/4nP3/2n1b4/6N2/9/1r2C4/4c4/4B4/3pN4/4KC3"],[121,"柳营射猎","","2n1ka3/3RaR3/C3b3N/6N2/6b2/9/9/9/r2p1pr2/4K4"],[122,"地富兵强","","4kabC1/4a4/4b2N1/5P3/9/9/9/6Cr1/R1pp4r/R3K4"],[123,"逢山开路","","1Nba1k1n1/7P1/9/1P2R1n2/5rb2/9/9/C3R4/3p1r3/c3K4"],[124,"王俭坠车","","3k1ab2/2R3N2/1r1a2R1b/4p4/2p1c1P2/9/N8/9/4r1p2/3K5"],[125,"五虎下川","","5k2c/CN2a2R1/4ba3/3R5/9/2N6/9/3AB1n2/3p1p2r/4K4"],[126,"叶落归秋","","2ba2n2/4ak3/4b4/4R4/4N4/9/9/5C3/3rAp3/c1rAK4"],[127,"雪夜访戴","","1c2kar2/3Pa4/N3b4/4C2R1/2b1CR3/9/9/9/5p3/2rnK4"],[128,"耿恭拜井","","2bak1C2/3Pa1R2/4b1N1N/9/9/9/4Pr3/5C3/3npr3/3K5"],[129,"凿壁偷光","","2bk1a3/1R2RN3/c3ba3/2n6/9/1C7/9/9/3r1p2r/1Cc1K4"],[130,"鸦鹊争巢","","4k3C/c4P3/4N2c1/r6P1/4P2P1/4n3p/2p5R/3p5/4p1n2/3KC2N1"],[131,"入幕之宾","","2bak3C/2C1aR2n/2n5N/9/7N1/9/9/1r6B/5p2r/3RK4"],[132,"五霸争雄","","4kab2/1n2a2cC/2R1P3b/3N5/9/9/9/3p4r/r3p4/2RK5"],[133,"六国争雄","","2b1kab2/3Pa4/2N3n2/2C1pR1CN/9/9/9/4p4/1r5r1/4K4"],[134,"沧海腾蛟","","1C1k5/4P4/3N4R/5n2C/9/9/5N3/3ABAr2/1r1p1p3/4K3c"],[135,"竹马迎拜","","1P3k1n1/4a4/5a1R1/1N2P3N/1C3n3/9/1c7/3p5/r3p4/3K1p3"],[136,"惊鸿整羽","","3aka3/3P1n3/NR2b4/1Cp1p1p2/4c2C1/9/9/9/6r1r/5K3"],[137,"匹马平胡","","3k1a1R1/9/2cab4/2n1R4/2b6/4P4/3N5/3CB4/1r1p4r/4K4"],[138,"群雄割据","","2baka3/3N4C/4b4/1r2PR3/9/9/4c4/2nR3C1/5p2r/4K4"],[139,"并驾连驱","","C4k3/4a4/5a3/9/4N4/1p3RN1c/4c4/2p1C4/1rn4r1/3K1R3"],[140,"引龙出水","","4k3c/3Ra1P2/3ab1N2/9/2b6/9/9/3KCR3/1nr1p1r2/5C3"],[141,"细柳屯兵","","2Pak4/CR2a1P2/4b2R1/9/9/1C7/4c4/9/2nr1p3/1r1cK1B2"],[142,"七国连衡","","1n2ka3/R3a1P2/1P2b1n1C/5R3/2b1P4/1N7/9/5p3/4r4/3p1K3"],[143,"见害必避","","2bak1r2/4aP1R1/b3c4/8p/9/2R6/r8/4B2C1/p3A4/4K1B2"],[144,"清门缵戎","","2b1ka3/4a4/4b3n/3R1N3/6R2/9/9/3C3C1/1nrpA4/1c2KA3"],[145,"开门待战","","CnC1k4/9/7P1/4p4/p5p2/6B1r/1R4Pr1/4BAN2/6p2/5K3"],[146,"远猎山林","","3a5/1n1ka4/9/5N3/2P6/C8/R8/B2ABA1r1/3pNp3/rc2K4"],[147,"烧牛凿城","","3akaP2/9/1R7/2pNp4/1C4b2/9/9/3NB4/1n1p1p3/4Kcr1c"],[148,"拨乱反正","","2R6/C2Rak3/4ba2b/P8/1r7/9/2p1p4/3An1p2/3KA4/2r6"],[149,"腾蛟起凤","","4R4/3ca4/4ka3/5P3/C1b2R3/9/4P4/3AB1n1r/3p1p3/2N1K4"],[150,"吕帅鹰扬","","3aka2R/1R7/c1P2P3/2P1rr3/2N5C/7C1/9/3p5/4p4/1p1K5"],[151,"虏马饮江","","3ak1b2/2P2P3/3ac2P1/9/1R7/C5N2/9/3p1A1C1/4p2r1/5K3"],[152,"江心下钓","","3akabr1/1R3P3/9/9/2C6/4N4/9/4p4/2nn2r2/1R2K4"],[153,"死敌为忠","","N2k1a3/5P3/3a5/9/9/9/9/C3RA3/4Nr3/2p1K1pnc"],[154,"外攘四夷","","3a1k2C/3ra4/4b4/9/6b1N/6cR1/9/3n5/4r4/3K2cR1"],[155,"足蹑天窟","","2b1ka2N/6R2/bR7/9/1C2r3C/9/9/9/c1r3p2/c2K5"],[156,"三献刖足","","3k5/1PR1a4/2Nab3b/6C2/9/4n4/9/9/2cp5/1rc1K2R1"],[157,"指鹿道马","","2bak4/4a4/4b4/N4CN1R/9/9/3n5/9/2p1AK3/c2A2r2"],[158,"暴虎凭河","","C3kab2/4a4/N3b4/2N6/9/3C5/9/3A2r2/3K3c1/3A2n1c"],[159,"前后绝伦","","3ak4/4a4/4b4/6N2/9/3rC4/4c4/4BR2C/1n1rA4/4KA3"],[160,"倚闾望子","","3cka1n1/3Ra4/3nb4/7N1/9/6C2/9/9/2r2p2r/1R2K4"],[161,"远害全身","","9/3k5/R2abN2C/C3P4/2b6/9/9/4p4/2r6/cr1AK4"],[162,"朱云折槛","","2bakab2/5RP2/7P1/2P6/9/2N6/9/4Cp2C/r3p4/5K3"],[163,"选将练兵","","c4a3/1r1kaP2C/b1R1b2c1/4CN3/9/9/9/9/4p3r/5K3"],[164,"凿壁借光","","3a1k3/2R1a4/3cb1n2/1C2N4/2b1C3R/9/9/9/r1r2p3/4K4"],[165,"遇水架桥","","3k1n3/1R3R1n1/b3b4/3P5/9/9/9/4B1CC1/3ppcr2/5K3"],[166,"立倾敌国","","4ka3/2R1aR3/3cb4/9/3N5/9/9/C3C4/3p1pnr1/4K4"],[167,"功成略地","","2b1ka3/1R2a1P2/4b4/5R2C/4N4/4n4/9/4p4/1r5r1/4K4"],[168,"疾如激电","","3ak4/3ra3R/9/9/9/1r2P1C2/5NP2/6n2/3p1p3/4K2R1"],[169,"阴陵失道","","2b1R2c1/R3a4/1n2kaN2/4p4/2bP5/6C2/9/9/3r1r3/4K4"],[170,"面缚自首","","6b2/3PR1P1c/3P1k3/7c1/2b3p2/2N6/9/2C6/3p1r3/4K4"],[171,"赢缩无常","","3k3C1/2P6/4cN3/9/9/9/4P4/4Bp3/1rrnA2R1/5K1p1"],[172,"动行网罗","","3a1k2C/4a3N/5c3/5P3/9/9/9/6p2/1n1p5/2p1KAC1c"],[173,"水枯见鱼","","4ka3/4aR3/4N4/4p4/9/9/4P4/4C4/c1nrAR3/4KA3"],[174,"三气周瑜","","2b1ka3/3Pa4/4b1c2/6RC1/3R2c2/8C/9/2n6/3p3r1/4K4"],[175,"四面旋绕","","C2R4c/5k3/b2a1N2b/2R6/9/9/9/4p4/3nr1p2/c4K2C"],[176,"送往迎来","","6RNr/5k3/4ba3/9/9/9/9/2R1p4/3pAr3/4K4"],[177,"声势相倚","","3k5/8C/9/p6R1/7R1/9/9/4B4/r2rA4/4KAB2"],[178,"黾勉同心","","4ka3/3RaP1n1/6R2/9/4P4/6C2/9/9/2rrp4/c4K3"],[179,"边烽惊虏","","2C6/5k3/bP1Nn1R1n/1r7/6R2/9/5c3/3p5/4p4/3K5"],[180,"暮鸟投林","","3k5/2R6/3a1nN2/9/9/9/9/5R3/1n1r1C3/2c1KcrN1"],[181,"海底诛龙","","2bakab2/7r1/9/3N5/9/8C/9/3RB4/4pcn2/3K5"],[182,"投肉馁虎","","2baka3/9/4c1R2/6N2/8C/9/9/4B1r2/4pp3/2BK5"],[183,"远遁边境","","c3k3C/2P6/1P6b/9/9/2C6/9/3RBr3/1p2r4/2BK5"],[184,"蛇龙混海","","C2k5/4P4/r2cb1N1b/8C/6r2/9/9/6p2/4p4/5K1R1"],[185,"酸毒道路","","5k1n1/c3a4/5aR1b/6N2/2r5C/9/9/9/3p1p3/4K1R2"],[186,"宿鸟惊弹","","2b6/1C2k4/n3bR3/6N2/9/9/9/1R7/3p2rr1/1C2K3c"],[187,"萤惑退舍","","3a1k3/RC1cc4/r2a5/2N6/9/9/9/5p3/4p2r1/5K2R"],[188,"载浮载沉","","2bak3C/4a4/2P1b4/6RR1/9/9/9/9/c1nr1p3/4K4"],[189,"闭门扫轨","","3a1k3/4a1R2/4brN2/1N7/9/9/9/1C4p2/3p4p/4K3C"],[190,"乘风吹火","","3ak4/c3a3R/5c2N/6C2/6b2/9/9/9/1r3p3/4K2R1"],[191,"劳问将士","","3k1a3/1NR2n3/3a5/1r4CC1/2b6/9/9/9/1c1p3r1/4K4"],[192,"两地关心","","2bak3C/4aP2N/4b4/5C3/9/9/9/3p5/4p2r1/3K5"],[193,"同功并位","","2ba1k3/4a4/4b3R/9/8R/9/9/3A2n2/3pA1r2/4K2c1"],[194,"步设陷阱","","3a1a3/3k3c1/1n2RN3/5r3/8R/9/2n6/9/3r1p3/2c1K4"],[195,"盐车困骥","","2bk1aN2/1R7/3a5/9/9/9/C7C/1p7/1np2p1r1/4K4"],[196,"雪拥蓝关","","2ba1kb2/1P2a1R2/3cnrN2/C8/9/9/9/9/4p4/3K5"],[197,"投命仇门","","2bk4C/9/3a5/5cN2/9/9/8P/6n1B/2r6/1R2KA2r"],[198,"惊鸟藏枝","","4kC3/3RaP3/3C2n1c/Nr1R5/9/9/9/4p4/6r2/4K4"],[199,"雕鹰捉兔","","5k3/3Pa2R1/4ba2b/4C4/4N4/9/4c4/9/5p3/1r1nK4"],[200,"落花流水","","3a1k3/R3a4/4b1P2/3R4C/9/4C1N2/r8/9/2r1p4/3K5"],[201,"三请诸葛","","3ak1P1P/4a4/9/9/4p3C/c3C1R2/9/5p3/2rp5/4K1R2"],[202,"行监坐守","","3ak1b2/9/4ba3/5R1N1/3r5/9/4c4/2r1B2R1/4A4/4KA3"],[203,"远近惊骇","","9/4a4/3k1a3/1NP1p4/9/8C/4P4/cr1AKA3/5r3/2n6"],[204,"雷震八荒","","R1C6/2P6/b2ak4/6P2/6b2/6B2/9/c4K2n/9/2rR2r2"],[205,"四畏廉名","","3aka3/9/4b2Rc/4P2N1/6b2/7C1/9/9/2nrA4/4KA3"],[206,"孤星坠地","","9/4a4/4ka3/1NP1p4/9/9/8C/1p2KA1rc/2c1A4/5p3"],[207,"菱叶穿萍","","2ba1k3/2P6/1n1a5/4C1N1R/1n5Cr/9/9/3p5/4p4/3K5"],[208,"用兵最精","","2ba5/4a4/1P1k5/R7N/C8/6B2/9/2n1B4/5pr2/4K3c"],[209,"叁参见佛","","4ka3/3Rn4/4b1r2/N1p6/1nP6/9/9/3C5/5r1p1/4K3c"],[210,"兵马如云","","Nr2kc3/4a3n/2R3n2/4RN3/9/9/7C1/9/3p1pr2/4K4"],[211,"晚鸟争枝","","r4Rb2/4k2C1/4b4/9/1N7/1r6R/9/4n4/3p1p3/4K3C"],[212,"雁惊云网","","1R3a3/3k3C1/3a4b/6pN1/9/9/4n3c/5p2C/4r4/5K3"],[213,"投石入水","","3ak4/4a4/b1C1b4/9/6N1R/9/9/5p3/r3p4/3p1K1R1"],[214,"阻住行程","","r2aka3/7rC/1R2b4/3N5/9/9/9/p7B/5pp2/4K4"],[215,"猛虎出林","","5a3/4k4/4b4/6N2/6b2/9/2nR5/2rC4C/4p4/3K1c2r"],[216,"载沉载浮","","2bak3C/3ra4/4c3b/7R1/9/9/9/3A5/r3p4/3K2R2"],[217,"急流勇退","","3ak4/3naP1C1/8R/P8/9/9/9/1rp1B4/4p4/3K5"],[218,"路隔星河","","r2aka3/3P5/8R/4r3C/6C2/6R2/9/3p5/4p4/3K1p3"],[219,"屈突徙柴","","cc1a1k3/3Pa1R2/5rNr1/9/6R2/9/9/9/3p5/3AK4"],[220,"攀辕卧辙","","1r2ka3/2P1a2P1/n3N4/4R4/6N2/9/9/9/5pc2/c3K4"],[221,"野马舞风","","R4a1C1/3ka4/8b/7N1/6b2/1r7/9/2C6/4p3r/c4K3"],[222,"鱼游浅濑","","1R1a3r1/1C1cak3/2N6/5r3/1R7/9/9/5n3/C3p4/3K5"],[223,"军中烈士","","3akr3/R4r2C/3a5/9/9/9/9/6n2/C2pA4/1R2K4"],[224,"随形助胜","","3a1k3/1Nc1a1R2/5rN2/9/9/9/9/9/3p5/4K1Rrc"],[225,"循序渐进","","3k5/1R2n1P2/2R1b4/9/r2P5/7N1/9/9/4r3C/3K5"],[226,"脱网逢钩","","4k4/4a4/4Pa3/4p1pCR/3N5/9/9/5p3/6r2/5K3"],[227,"舍生取义","补图复原","3k1a3/2R1a1N1c/2R6/9/9/9/9/4Cp3/4r4/r2c1K3"],[228,"流星赶月","","9/9/3ak1P2/5PR2/6C2/9/9/9/nr2p1pp1/R4K3"],[229,"游鱼吞钩","","4k1b2/4aPN2/5a3/9/N8/6C2/4c4/9/2nr1p3/4K4"],[230,"猛虎入山","","2bakcb2/4a4/9/2N6/1C7/3R5/4R4/4K4/5r3/2n2r3"],[231,"胡骑迫背","","2bak1b2/4aR3/9/3NR4/9/9/9/6n2/r2r1p3/4K4"],[232,"用舍相碍","","5a3/3ka4/2Ncb4/9/9/C8/9/3R3r1/3pAp3/4K4"],[233,"望尘遮道","","4k4/3RaP3/n3Na3/8C/9/9/6r2/5p3/4p4/R4K3"],[234,"停车绊马","","n4k3/1R7/3a5/2N6/9/2C5R/5n3/9/r4cp1r/4K4"],[235,"居中反祸","","2bk2r2/P3aR3/n1r1b4/9/9/6R2/9/3n5/4p4/1C3K3"],[236,"勒马停骖","","3ak1b2/4a1P2/4b4/5N3/R3C1p2/9/9/5n3/4r4/3K5"],[237,"怀春育孕","","2b1k1b2/3Ra4/2r2a2r/6R2/4P4/7C1/9/9/4p4/5K3"],[238,"长鲸授首","","5a1C1/3ka4/4b4/7N1/1Rb6/9/9/5n3/2r1p4/c4K3"],[239,"子胥过关","","3akab2/2r6/4b4/2C4N1/9/9/9/1p3p3/4p4/3K3R1"],[240,"弃短取长","","4kab2/5P3/4b1n2/1N1N5/9/1n4C2/9/3p5/4p4/3K5"],[241,"凭马渡江","","2b2a3/C3a4/3kb4/9/9/5RN2/9/1C7/r2r1p3/4K4"],[242,"鱼游釜甑","","3aka3/6P2/9/6P2/6n1C/7R1/9/1r3p3/4p2C1/5K3"],[243,"明修栈道","","3r1k3/C5P2/b4a3/CR2R4/9/9/9/2n6/5pr2/4K4"],[244,"祸生肘腋","","1R1a5/2P1k4/1n2b4/4c4/9/9/9/2C5R/4r1r2/5K3"],[245,"苍舒称象","","2ba1k3/4a4/9/9/9/4R4/9/2CrB4/3r5/2B1K3R"],[246,"困魏掣燕","","3k1a3/4a4/4P4/9/6C2/9/9/2R1B1r2/5p1p1/3AK4"],[247,"伏虎降龙","","3k5/2P1a4/c8/1r3N3/6b2/9/5RP2/C8/4p4/5K3"],[248,"同心赞政","","6R2/5k3/5a3/5R3/6p2/9/9/4rC2B/2n6/5KBr1"],[249,"开拓心胸","","9/9/3ak4/9/4P4/9/6R1P/r2AB4/2r6/3K4R"],[250,"雁阵排空","","6c2/5k3/1N2b4/4C4/2b2C3/3R5/9/6n2/7r1/4K3c"],[251,"惊心破胆","","2rak1C2/5R3/3a5/6N2/9/9/9/r3C4/4p4/3K4R"],[252,"诱虎吞钩","","4ka3/4a4/3n5/3N5/9/C1R6/2R6/4n1r2/3p5/4K4"],[253,"二龙绕室","","3a1kb2/4a4/4b4/5NN2/9/9/9/8C/3r4c/4K1n2"],[254,"毙马仆途","","3a3nC/1R4c2/2C1k2r1/9/9/r6N1/9/9/4p4/3K5"],[255,"历诛四寇","","3k5/2R6/9/9/9/9/9/3ppp3/2Rp5/2B1K4"],[256,"车行同轨","","4k4/C8/3R5/9/9/9/9/3RB1n2/1r2r4/3K5"],[257,"挡住英雄","","6b2/9/3k4C/4P4/9/9/9/4R4/3r1p3/4K1B2"],[258,"独夫当关","","3ak4/4a2P1/2R6/9/9/9/9/5A3/3R1pr2/4K4"],[259,"阴持两端","","3k5/9/9/8p/9/2R3B1r/9/4BA3/6r2/2R2K3"],[260,"直造竹所","","3k5/4R4/4b3R/2r1p4/9/7C1/9/9/5pr2/4K4"],[261,"金创满身","","9/9/R2ak1P2/2rN5/9/9/1C7/4rn3/3K5/9"],[262,"不服自老","","2Pa5/1r2a2R1/4k4/9/4N4/9/9/3p1n3/9/3K5"],[263,"增补隘口","","4k4/4a3R/4Pa3/7C1/4p4/9/9/2r6/5r3/3K5"],[264,"跃鲤吞饵","","6b2/1N1R5/5k3/9/9/9/9/4p4/2Rp1p2r/4K4"],[265,"巅峰得路","","2b1k4/2P6/3Rn1P2/9/4r4/9/9/3R5/4r4/3K5"],[266,"入穴取虎","","3k1a3/9/3a5/3rRN2C/9/9/9/6n2/5r3/4K4"],[267,"脱钩逢网","","3C1a1c1/C8/3kbN3/4P4/9/9/9/9/r4p3/4K4"],[268,"直穷到底","","9/4ak3/5a3/6P2/7r1/1r7/9/C2RR4/5p3/4K4"],[269,"投躯帝廷","","1c2k1C2/c4P3/5a3/9/9/9/9/7R1/3rp4/5K1C1"],[270,"杨香跨虎","","N2k1ab2/2R1a4/2R6/9/9/5r3/9/5n3/4r4/5K3"],[271,"吐胆倾心","","3a1k3/c2P5/2r2a3/6N2/9/6R2/9/4C4/4r4/5K3"],[272,"赤心报国","","3k1aP2/8C/5a3/4R1N2/9/9/9/6n2/3r1p3/4K4"],[273,"舍命如归","","9/r2k5/1R1ab4/3N5/2b6/1C7/9/3n1p3/9/5K3"],[274,"辎重塞途","","3k1a3/nPR1a4/2Nr5/9/9/9/9/9/5r3/2c1K4"],[275,"打草惊蛇","","2raka3/9/9/4C1NRp/9/9/9/5p3/3p5/4K4"],[276,"路车乘马","","1c1k5/4R4/4N4/4rC3/9/6Rr1/9/6C2/4p4/5K3"],[277,"双骑追敌","","5k3/9/1P7/7NN/9/8C/9/3p5/r3p4/3K5"],[278,"异地同心","","5k3/8P/4ra3/9/9/9/9/5R1R1/4r4/5K3"],[279,"火炎昆岗","","3ak1b1r/4a2Pn/4b4/4C4/9/9/cR7/n8/4A1p2/3AKC3"],[280,"将机就机","","3ak4/1C2aR3/2n1c4/7N1/9/7R1/9/4C4/4A1rnr/3AK3c"],[281,"诳楚救主","","3ak4/4aR3/n3N4/4P4/2b6/8C/4c4/N3B1n2/1r2A4/3RKAr2"],[282,"前后一辙","","4ka3/4aR3/4N1C1b/c1p1p4/9/9/2N1P1R2/5C3/r1rp5/5K3"],[283,"一举而定","","1r1akab2/5R3/4b1n2/7N1/9/2B6/2r1P4/B2RC4/3KA4/c8"],[284,"肉钽负荆","","4ka3/R3a4/b2rb4/4P2N1/9/9/9/3Ap4/4pp3/1R1K1A3"],[285,"一骑困魏","","r4k3/4a1Pn1/1n3a3/4N1p2/9/9/9/4C4/4p4/2BK5"],[286,"野马诱虎","","3k3r1/4a4/3a5/6N2/9/9/9/4C4/4p2c1/2BR1K3"],[287,"夺马驱敌","","2bk1a2r/4an3/cR2b3N/p3CR3/2p1p4/1C7/4Pp2P/2c1B4/3pr4/2B2K3"],[288,"敛手削地","","1nb1kab1r/3Ra4/3cc1n2/C1N1p1pR1/9/3N1p3/4Pp3/4C3B/4r2p1/5K3"],[289,"汗马功劳","","2ba1kbRC/3Ra4/9/2pPp4/3Nc4/9/4P4/3pB1N2/r2pA4/c3KAB2"],[290,"莘野邀汤","","2bak4/r2PaRR2/1n2N3b/4p1n2/9/9/9/4C4/2p1App2/2B1KAB1c"],[291,"城门失火","","3ak1Cnr/2P4Rn/3a5/9/9/C8/9/2p1B4/4rp3/3K5"],[292,"凤起丹山","","r1P1k4/5P3/9/1c7/9/2N6/9/9/2p3p2/1p1KCN1rc"],[293,"两虎共斗","","1n1ak1br1/1r2aR3/4R3c/9/9/9/9/1C2B2Cp/4A4/3AK3c"],[294,"勤劳一纪","","4ka2R/3na4/2rcb3n/1R3N1NC/2b4P1/9/9/6pr1/7p1/5K3"],[295,"济弱扶倾","","5a3/3k1P3/2P1ban2/1N7/2b6/9/P5p2/4B4/3pr4/c1BA1K1R1"],[296,"绕江撒网","","6b2/4ak1C1/2N2aR2/4P4/2b6/9/8P/4B1p1r/r3Ap3/3AK3c"],[297,"鸮立中天","","C1b6/1RCka4/5a3/p1p1p4/2b6/9/P1P1P4/9/c3p2p1/5K1c1"],[298,"虎帐谈兵","","3ak4/2PPa4/b3b4/2p1C1N2/3c5/1rB6/9/3p5/4p2p1/1CB2K3"],[299,"参前倚衡","","r2k1a3/3na1R2/3cb1c2/3N1R3/6P2/3C5/9/B4p2B/2p3r2/4K4"],[300,"陈桥兵变","","2ba1k3/2rPa4/R3b4/4cP1C1/2p6/9/3rP4/4B4/3pp4/2B2K1R1"],[301,"手探月窟","","4kabn1/R3a4/4b1P1r/9/p8/2P5P/9/1R1pBC3/2r3p2/3AKABc1"],[302,"蹇驽卧道","","3ak1b2/4a4/4b3n/2R1C1pCp/5R3/2Bn5/9/4BA3/6rcc/3AK4"],[303,"板筑隐贤","","2brk3C/4a4/3ab3n/2p3N2/4C4/2P6/9/B1p1B4/c2pA1p2/c3KA3"],[304,"雌鸡化雄","","2bak1r2/3Pa4/4bc3/N6R1/p8/3R2B2/4P1n2/2C6/2r3p2/c1BAK4"],[305,"众星拱月","","2baR1cNC/R8/5k3/8p/3r1n3/2p6/P1P5P/4C3B/2p1A1r1c/4KA3"],[306,"轻兵锐卒","","3ak4/2P1aP3/8N/9/4P4/3p5/8P/4Bp2n/2p1N4/3K1A3"],[307,"拔去病根","","2bak3C/4a2P1/6N1b/2C5p/9/9/P7n/2p1B4/4pp3/3K5"],[308,"宽一步胜","","C2k2b1c/4a4/b2a2N2/2R3p2/2p3n2/9/9/5A2r/4AKn2/9"],[309,"三军联位","","1P1ak1b2/4a4/4b4/6p2/2N4N1/1C2C4/6P2/r2ppp3/9/c3K4"],[310,"有家难奔","","3ak4/4a4/4b4/9/2b4R1/1N5n1/5p1r1/3RB4/2p1r4/2B2K1c1"],[311,"金鸡抱卵","","3k1ab2/2R1aP3/2n1b3r/9/5R3/9/3r5/N3B4/4AC3/4K3c"],[312,"深入远岛","","1r4b2/4k4/rN2b1P1n/6p1p/9/3R3C1/9/5A3/p4pc2/3RK4"],[313,"马跳澶溪","","3ak4/4a4/b3b3P/9/4N2R1/9/2p6/1p1AB4/3KA4/n3r1B2"],[314,"堵塞要路","","4kab2/4a1RCr/4b3n/2pRN4/4N4/4P4/5p3/9/3pr4/5K3"],[315,"三将夺关","","3a1kb2/4a1P2/4b4/5N3/9/P7C/6P2/4B4/r2pA4/c3KAB2"],[316,"渴骥饮泉","","2ba1kbRC/2N1a4/9/4p4/4c1p2/9/9/1p2B1r2/4r1n2/3K2B2"],[317,"移星换斗","","4kab2/4a3C/3rb4/n1R4Cc/5R3/1r7/9/4B4/3pp4/2B2K3"],[318,"赤壁鏖战","","c2a1k3/3Pa4/n3b4/5P1CP/6b2/1rB6/9/9/3pp4/2B2K1R1"],[319,"匿影避形","","2bak1b1N/9/2n1ca3/3R1C3/9/9/9/C3B4/c3p2p1/1rB2K3"],[320,"右相安刘","","3k1ab2/4a4/2R1P1r2/9/2b6/7r1/9/1p2B1C1R/5p1p1/4K4"],[321,"好勇不矜","","5kbc1/9/P5n1r/1RN6/9/9/3p1p3/R3C1r1B/2n6/5K3"],[322,"跨海东征","","3rk3C/4a4/3ab4/4C1N2/9/9/9/B3B4/r2pA4/c3KA3"],[323,"过眼成虚","","4ka3/3Ra1C2/4b2RN/4n4/9/9/5p3/9/4Ar2r/3AK3c"],[324,"临难忘躯","","3ak4/3RaP1N1/5c1Cc/9/1rb6/9/9/5C3/1p2r1p2/3K5"],[325,"夜过昭关","","1r1a1a3/4k4/4bc3/cN1R1C3/2b6/9/9/9/4pp3/2BK2C2"],[326,"闭门思过","","5a3/2P1k4/r2Pba3/7C1/p7P/9/9/9/p3p3p/5K3"],[327,"奇妙文武","","2ba1k3/4a4/4b4/5N1Rp/9/9/3pp4/4B4/4pp3/3K2B2"],[328,"忠孝两全","","C1b6/1RCka4/5a3/p1p6/2b6/9/P8/9/c3p2p1/5K1c1"],[329,"虹霓贯日","","2b1kab1r/C3a4/9/PN7/9/3p5/9/C8/5p1p1/2B1K2c1"],[330,"近攻远交","","3k1nbr1/2P1a4/b2a5/8R/9/6R2/9/5p3/4p2p1/3K5"],[331,"殒命宁亲","","2ba1k3/3Pa4/4b4/4pP1C1/9/9/9/1r2B4/3pp4/2B2K1R1"],[332,"车马盈门","","2bakab2/9/9/9/4N2R1/2P6/9/B3B4/r2pA4/c3KA3"],[333,"截趾适履","","3ak1bR1/9/4ba3/5N3/C7p/2B5r/8c/3p5/5p3/3AK4"],[334,"策马入城","","2bak1C2/3caP3/4b4/3N1Cn2/9/9/9/8n/4p4/5K3"],[335,"蝶恋花心","","4R4/3k4r/4b4/7P1/6b2/7p1/9/C7B/4A2r1/2B1KA1p1"],[336,"殃及池鱼","","2ra1a2r/4k3C/4b3N/5R2p/2p3b2/9/9/9/4p4/5K3"],[337,"伍相奔吴","","4k4/2PP3PP/9/9/4p1rN1/5p3/9/4B4/3pp4/5K1R1"],[338,"大车无輗","","3a5/2N4N1/1r1k5/2P6/9/9/3r4P/4BA3/3pA4/2B1K4"],[339,"英略盖世","","1nb2kr2/3Pa2R1/3nba3/N3C2C1/6r2/9/9/9/9/5K3"],[340,"星坠日升","","2bak2r1/4a4/4b4/C2N1C3/9/3R5/9/2p6/2c1p4/3K2p2"],[341,"兵马侵境","","2ba1a3/4k4/b1R2N2P/9/4P4/9/3r1p3/3A5/3pp4/5K3"],[342,"抱火积薪","","3a1kbr1/1C2a4/2P6/p8/4p4/9/9/3p5/4Cp3/3K2R2"],[343,"闭窟捉虎","","C3kab1r/2C1a4/b1n5c/1N7/9/9/9/9/2pc1p3/4K4"],[344,"深入敌境","","C8/C2Pak3/3cba2b/9/9/9/2R2p1r1/9/4r2p1/5K3"],[345,"爱身待时","","2bk1a3/5P3/3a5/1C2p1C1p/9/9/9/4B4/1p2r1p2/3K5"],[346,"石燕拂云","","4ka3/4aPN2/8b/7Cp/9/2P6/9/9/2p2p2c/4K3c"],[347,"朝野从容","","4kr3/4a2R1/3ab3b/9/6P2/9/4r4/1R2C4/5p2c/3K5"],[348,"绝长补短","","1P2ka3/9/b2a1PC2/4C1p1p/9/9/9/9/1p2pp3/3K5"],[349,"夷齐扣马","","N1bakab2/R8/9/9/9/9/5pp2/4B4/3pp4/5K3"],[350,"力小任大","","3k5/4a2P1/9/2P6/9/3p5/9/BR4p2/rp2pp3/2BK5"],[351,"管仲随马","","C3kanr1/9/1R2ca2c/9/1N7/9/9/9/4p2p1/5K3"],[352,"老而不倦","","2b1k1b2/3P1P3/3a1a3/7C1/9/9/9/9/1p2pp3/3K5"],[353,"徐母回车","","2ba5/3k3C1/2Pa3R1/2p6/8P/9/9/9/1p2r4/3K5"],[354,"虎守三穴","","4k1b2/3Pa4/4b4/9/9/7C1/2P6/2rc5/4p4/1R1K5"],[355,"一虎下山","","9/3Pak1P1/5a3/9/4N4/9/9/4B4/1p2rp3/2BK5"],[356,"猛虎驱羊","","6b2/1R7/3kb4/P6P1/9/9/9/9/pp3pp2/4K2p1"],[357,"首动尾应","","4k4/9/9/4N4/9/2B6/9/nR1pBp3/p2r5/c3K4"],[358,"引雏入巢","","5a3/4a4/5k3/9/6P1R/9/1pp6/3A5/1n1KA4/4r4"],[359,"四海一家","","2b2a3/2P1k4/1r1Pba3/6C2/9/9/9/9/4p4/2p2K3"],[360,"涂廪浚井","","5k3/1P7/2PP1a1P1/9/9/4R4/9/5p3/3p1p3/1p2K4"],[361,"弘羊心计","","5a3/3P5/4ka3/C8/9/1N7/P8/9/3pp2p1/5K3"],[362,"视死如归","","r2k5/9/2P6/9/6bN1/4R4/9/2np1pn2/4K4/9"],[363,"拔本塞源","","3k1a3/2P4R1/3a5/9/9/7C1/9/9/1p2rp3/3K1c2R"],[364,"从容中道","","3k1a3/2P4R1/3a5/9/6bR1/9/9/7C1/1p2rp3/3K5"],[365,"举直错枉","","4ka3/3Pa4/4P3b/9/9/9/8p/6C2/4rp3/3K2R2"],[366,"以恩塞责","","3k5/9/3a5/9/9/9/9/5R3/c2rA2p1/3C1K3"],[367,"少见相拘","","3k2b2/4P4/r5c2/p5R2/8p/9/9/9/9/4K4"],[368,"四门斗底","","4k4/9/3aP4/9/9/9/3p1p3/4R4/3p1p3/4K4"],[369,"兔游月窟","","6R2/3P1k3/3a1a3/9/9/6B2/9/B1r6/5p3/4K4"],[370,"时堪乘便","","4ka3/9/3a1P3/4C4/6C2/9/9/9/1p2pp3/3K5"],[371,"五老降庭","","4k4/9/3a5/9/9/9/6Rp1/3pp2R1/3pp4/5K3"],[372,"兵入其腹","","5k3/3P5/3a1a3/9/9/9/p3r3p/C6R1/5K3/9"],[373,"兵势无常","","8r/5k3/r8/p8/9/4R4/P8/4C3B/9/4K1B2"],[374,"四面设网","","3a5/5k3/2N2a3/8P/4C4/9/9/9/1p1p2p2/1c2K4"],[375,"托孤寄命","","6b2/1R7/3kb4/9/9/9/9/4B4/pp3pp2/4K2p1"],[376,"勒兵为备","","3a1k3/4a4/9/n7c/6P2/2C4N1/9/5A3/5r3/4K4"],[377,"伏兵要路","","9/3Pak3/5aP2/9/9/3N1p1p1/9/5p3/4p4/3K5"],[378,"筑坛拜帅","","3ak4/4a4/2R6/9/9/9/9/2C3p2/3r5/4K1c2"],[379,"诸葛出庐","","4k4/3RaP3/4r4/9/9/9/9/9/4A4/3AK1B2"],[380,"二马追风","","5k3/7P1/9/1NN6/9/9/2p1p4/3K1p3/9/9"],[381,"退无所归","","6b2/9/3k5/4P1N2/2b6/9/9/9/3p2p2/4K4"],[382,"举鼎争功","","9/4k4/4bR3/9/2b6/4r4/9/9/3KC4/3A5"],[383,"胡爽扣马","","4k4/9/N8/9/9/9/5pp2/9/3pp4/5K1R1"],[384,"剪棘开径","","4k4/P3a4/5r3/9/9/9/p8/7R1/4K4/9"],[385,"投肉饲虎","","3k1c3/4R4/5r3/9/9/9/9/1p7/4A3C/4K4"],[386,"海底觅针","","5kb1R/4P2P1/6r1b/9/9/9/9/9/9/4K4"],[387,"戮力一心","","3k5/4CP3/9/9/5R3/4r1B2/9/9/6pp1/5K3"],[388,"运筹帷幄","","9/6P2/4k4/3Rp4/4r1b2/9/9/9/3K5/9"],[389,"身无所措","","4ka3/4a4/9/9/9/1R7/4pp3/9/9/4K4"],[390,"羸羊触角","","4k4/3Pa4/4r4/9/9/7p1/9/5R3/5K3/9"],[391,"以兵服人","","9/2P1k4/5R3/4p4/4r4/9/9/9/5K3/9"],[392,"驱虎离山","","4k4/9/9/9/9/9/9/3pp4/8R/2p1K4"],[393,"倾身下士","","9/5k3/3a5/9/9/9/9/4R3C/4K4/5r3"],[394,"兵势尚强","","3ak4/9/4r4/5P3/9/2R6/9/9/9/3K5"],[395,"地险兵强","","3R5/4r4/5k3/4p4/9/8P/9/4K4/9/9"],[396,"引兵渡河","","5k3/9/b8/9/9/9/P8/4R4/5r3/4K4"],[397,"一兵取功","","9/3P5/5k3/8R/2b1r4/9/9/9/9/3K5"],[398,"将帅不忠","","4k4/5P3/9/9/2b1r4/5R3/9/9/5K3/9"],[399,"王母蟠桃","","2P2R3/4r4/3k5/9/9/9/9/9/5K3/9"],[400,"避难而行","","2b1ka3/4a4/4b4/1N2p3p/2NC5/5n3/4c1PCc/4p4/5K3/9"],[401,"双马饮泉","","4kab2/3Pa4/4b4/1N1N5/9/9/5p3/4B3n/3p4p/5K2c"],[402,"幽鸟攒阶","","4P4/3Pa4/4k1NN1/9/9/9/9/np2Bp3/2p6/c1BAK4"],[403,"踏雪寻梅","","2ba5/4ak3/bc4PN1/2p6/8p/p8/9/9/3p5/4K4"],[404,"二郎搜山","","2ba1kbn1/2P6/5a3/2p3p1N/9/9/9/9/4K4/2B3B2"],[405,"转祸为福","","3a2b2/4a1PC1/5k3/2p1P4/6b1p/9/9/8B/4p4/3K3p1"],[406,"双鹊投林","","3k1a3/2P1a1P2/N8/9/9/9/9/3p4p/4p4/2B2K3"],[407,"入洞捉虎","","2b2ab2/3PP4/5k3/4P4/9/1p7/9/C6p1/4p4/3K5"],[408,"追风赶月","","1c1ak3N/4aP3/9/9/p8/9/9/9/5p3/4K4"],[409,"得失有变","","4ka3/4a4/9/9/5R3/4pp3/9/9/4A4/3AK4"],[410,"家无安堵","","3a2b2/3ka4/4b4/9/9/2B3R2/9/B2A5/9/3AK4"],[411,"威震华夷","","4ka3/4a4/9/9/4R4/9/pp5pp/9/9/4K4"],[412,"痛断根除","","2bak4/4a4/4b4/4P4/9/8R/4pp3/9/4A4/2B1K4"],[413,"残虏投降","","5ab2/1P1k5/3a4b/9/6p2/9/6P2/9/4K4/5C3"],[414,"宁静待时","","9/3k1P3/3a1a3/9/2b6/6B2/9/3AKA3/9/3C5"],[415,"私渡关津","","9/5k3/8r/9/9/9/4R3P/4B4/3pA4/2BAK4"],[416,"私下三关","","4ka3/3Pa4/8b/7Cp/9/9/9/9/1p5p1/4K4"],[417,"动中有静","","3a1k3/9/3N1a1P1/9/8C/9/9/1p3p3/4p4/3K5"],[418,"蹇驽困厩","","3N1k3/4P4/b8/p4n3/2b6/9/9/9/4p4/5KB2"],[419,"厩焚伤马","","3nka3/4a4/8R/4R4/9/9/9/3ppp3/9/4K4"],[420,"独虎下山","","3k5/2P1a1P2/5a3/2N6/9/9/9/9/1p1p2p2/4K4"],[421,"失左右手","","9/3R2P2/3ak4/4p4/4r1b2/9/9/4B4/9/4K1B2"],[422,"内攻外御","","C3ka3/4a4/1cC6/9/9/6B1P/p8/9/5p3/4K4"],[423,"抹马潜戈","","3k2b2/4P4/4b4/3cN4/9/9/9/3K5/2p1Ap3/3A5"],[424,"遐迩归心","","3k5/4CP3/2P6/9/9/5p3/9/8p/4p4/5K3"],[425,"怯勇自服","","3cka3/4a4/9/p8/2p6/7R1/9/9/9/4K4"],[426,"驱将擒胡","","4k1b2/9/4b4/9/7Rp/9/8P/9/4K3c/9"],[427,"马灵兵胜","","3k5/4P4/9/9/9/1n7/7c1/3A5/2C6/1N2K4"],[428,"踊跃用兵","","4kab2/4a4/4b4/4P4/9/9/9/9/3K5/7C1"],[429,"一心向火","","2baka3/5P3/b8/9/9/9/9/9/3K5/7C1"],[430,"上陵下替","","3k5/5P3/3a1a2b/2N6/6b2/9/9/9/9/3K5"],[431,"能为必胜","","3a1k3/2R1a4/b8/9/2b6/9/9/9/9/4K4"],[432,"功成则退","","9/4aR3/3k1a2b/9/6b2/9/9/9/9/4K4"],[433,"钳塞士口","","3a5/5k3/2R1ba3/9/2b6/9/9/9/5K3/9"],[434,"束手就系","","5k3/4a4/3a4b/9/6b2/9/7R1/9/9/4K4"],[435,"上下离心","","2bak4/2R1a4/b8/9/9/9/9/9/9/4K4"],[436,"独行千里","","3k1ab2/4a4/8b/9/9/9/9/9/4K4/8R"],[437,"上下失望","","3a5/4a4/5k2b/9/6b2/9/9/9/9/2R1K4"],[438,"斗柄回寅","","5a3/4ak3/2R1b4/9/2b6/9/9/9/9/4K4"],[439,"左右并攻","","6b2/3k5/4b4/1P7/9/6B2/9/6C2/4K4/9"],[440,"士卒威服","","9/3ka4/1NP2a3/9/9/8p/9/9/9/4K4"],[441,"三军夺帅","","5k3/9/9/4R4/9/9/3ppp3/9/9/3K2B2"],[442,"国富兵强","","3aka3/9/9/p8/4P4/2C6/9/9/9/4K4"],[443,"济济多士","","9/9/5k3/4P4/9/2c3p2/9/5A3/4C4/4K4"],[444,"日月交蚀","","2cCka3/3Pa4/9/9/9/9/9/9/9/4K4"],[445,"地网天罗","","2b1C1b2/4PP3/3k5/9/9/9/9/9/9/5K3"],[446,"双孙扶老","","3ak4/4aP3/b8/9/9/6P2/9/9/9/4K4"],[447,"锐兵健步","","9/1P1k5/4b4/3P5/6b2/9/9/9/9/4K4"],[448,"茕茕孑立","","3a5/3Pak3/9/5P3/9/9/9/9/9/4K4"],[449,"游丝系虎","","2bk5/R8/b7c/9/9/9/9/9/9/4K4"],[450,"只马归命","单车巧胜马双象","2b1k1n2/9/4b4/4R4/9/9/9/9/9/4K4"],[451,"驽驹失厩","","2R6/3ka4/3a5/3n5/9/9/9/9/9/3K5"],[452,"华衣怒马","","4k1b2/9/4n3b/4R4/9/9/9/9/9/4K4"],[453,"野马踅田","","4ka3/4an3/9/9/4R4/9/9/9/9/4K4"],[454,"变生肘腋","","4k4/4a1P2/5a3/9/9/9/9/3K5/9/5C3"],[455,"计罗并用","","5k3/4a4/3a5/9/9/9/9/3K5/4C4/5C3"],[456,"孤生无倚","","5c3/9/5k3/4P4/9/9/9/3KB4/9/4C4"],[457,"国士无双","","3k5/4a4/5a3/9/9/9/9/3A1K3/9/4C4"],[458,"迎来送往","","3k5/9/9/6p2/9/4P4/9/7C1/5p3/4K4"],[459,"顾彼失此","","3k2b2/4P4/2c6/2N6/9/9/9/9/9/4K4"],[460,"单驹随牝","","9/4P4/3k5/2N1n4/9/9/9/9/9/4K4"],[461,"赶虎出穴","","5k3/9/9/9/9/9/9/4C2R1/4r4/3K5"],[462,"三辰不轨","","3ck4/4c4/4R4/9/9/9/9/9/9/3K5"],[463,"一恸而绝","","4C4/4P4/3k5/9/6b2/9/9/9/9/4K4"],[464,"填塞道路","","9/3k5/9/4P4/2b6/9/9/4C4/5K3/9"],[465,"侵害边卒","","5k3/9/9/p8/9/4P4/9/2C6/9/4K4"],[466,"一木难支","","4k4/4a4/9/4P4/9/9/9/9/4A4/4K4"],[467,"士孤将寡","","9/3kaN3/9/9/9/9/9/9/9/4K4"],[468,"七擒七纵","","1r3a3/9/3ak4/5PR2/6C2/9/4P4/3pp4/3pr4/5K3"],[469,"单马独还","马双兵和双卒双士","3ak4/3PaP3/9/5N3/9/9/9/9/3p1p3/4K4"],[470,"匹马平戎","马双兵和三卒双士","3k1a3/2P1a1P2/N8/9/9/3p5/9/9/p3p4/3K5"],[471,"公私安堵","马炮士相全和双车","4k4/9/9/9/9/9/4r4/3NB4/4A1r2/3CKAB2"],[472,"藏锋敛锷","双炮士相全和双车","4k4/9/9/9/9/9/4r4/3CB4/4A1r2/3CKAB2"],[473,"中外义安","车单缺士和车卒双象","2b1k4/9/4b4/9/9/3R5/9/4B4/1r1p5/3AK1B2"],[474,"盘石固守","车士相全和车双低卒","4k4/9/9/9/9/2B6/7r1/2R2A3/1p2Ap3/2BK5"],[475,"保卫一方","车炮相和车卒","2b1k4/4a4/3ab4/9/9/9/9/B2R5/4p4/1rCK5"],[476,"四方清晏","车马炮和车卒","4k1b2/4a4/4ba3/9/9/9/9/5R1N1/4p1r2/5KC2"],[477,"一兵解危","高兵单仕和炮士象全","5c3/4k4/3a1a3/6P2/2b3b2/9/9/5A3/5K3/9"],[478,"三仙炼丹","三兵和炮卒双士","3ak4/1c2aPPP1/9/9/9/9/9/9/4p4/5K3"],[479,"虎溪三笑","","4k4/9/9/1P7/2p3p2/9/7p1/4B4/4A4/3A1K3"],[480,"三军劫寨","仕相全对三卒","3k1a3/4a4/4b3b/7P1/9/2P3P2/9/9/9/4K4"],[481,"三顾草庐","仕相全对三卒","3k5/9/9/9/9/6B2/3p5/B8/2p1Ap3/3K1A3"],[482,"众寡不敌","车卒难胜单车","2b1k4/9/4b4/9/r8/9/9/9/p2R5/4KA3"],[483,"保障若石","","2b6/4k4/4b4/9/4r4/2B2R3/9/4C4/9/3K5"],[484,"保障坚牢","车炮双仕和双车","3k5/9/9/9/4r4/9/9/5R3/2r1A4/3CKA3"],[485,"化蛇当道","双炮双相守和车卒","5k3/9/9/9/9/9/r8/C3B3C/3p5/4K1B2"],[486,"三家鼎立","三兵双相守和单车","4k4/9/9/PPP1r4/9/9/9/4B4/9/2B1K4"],[487,"扣马苦谏","单马保和炮士象全","4k4/6c2/3a1a2b/6N2/6b2/9/9/9/5K3/9"],[488,"平定中原","","3c5/5k3/4b4/9/2b6/6B2/9/4B4/4p4/3K5"],[489,"全师保安","","3k5/9/9/9/9/2R6/6P1r/4BA3/6r2/2R2K3"],[490,"本固邦宁","仕相全和马卒","3k5/9/9/9/9/6B2/2n6/3A5/4Ap3/4K1B2"],[491,"保国宁家","仕相全对车","4k4/9/9/9/9/2B6/9/B2A5/2r1A4/5K3"],[492,"凭险自固","仕相全和单车","4k4/9/9/9/9/9/9/B2K5/4A1r2/2B2A3"],[493,"仗剑鞭马","","3k4C/2N6/9/9/9/9/9/9/3p2p2/4K3n"],[494,"控马避敌","马兵双相和单车","4k4/9/9/8r/9/1NB6/2P6/4B4/9/4K4"],[495,"三出祁山","","9/1c2PPP2/5k3/9/9/9/2p6/9/9/4K4"],[496,"士而怀居","","9/5k3/4b4/9/4r4/3R5/9/3Ap4/3K5/9"],[497,"士马疲劳","车马对车双士","4k4/9/9/9/9/4r1n2/9/3R1A3/4A4/3K5"],[498,"三镇连兵","三兵和车象","2b2k3/9/9/2PPP4/9/9/4r4/9/9/3K5"],[499,"努力固守","炮兵对双卒","5k3/4P4/9/9/2b6/9/9/9/3p2p2/4KC3"],[500,"固兵保全","车对双相双兵","4k4/9/9/4PP3/9/9/4r4/4B4/9/4K1B2"],[501,"士兵连结","车对双仕双兵","4k4/9/9/4PP3/9/4r4/9/5A3/4AK3/9"],[502,"边城隔虏","","1C7/4k4/1P7/9/9/9/9/9/4p4/rC1K5"],[503,"兵马徒劳","炮双相和马卒","4k4/9/9/9/9/6B2/6n2/4B1C2/4p4/5K3"],[504,"只马当士","马仕双相守和单车","4k4/9/9/9/9/9/9/4B4/4Ar3/2B1KN3"],[505,"只马当象","马相双仕和单车","4k4/9/9/9/9/9/9/3N5/2r1A4/2B1KA3"],[506,"仕卒离心","马低卒对单缺相","4k4/9/9/9/9/6B2/9/3A5/3pAK1n1/9"],[507,"休仕息马","马卒对单缺仕","4k4/9/9/9/9/6B2/9/4B4/1n1K1p3/3A5"],[508,"影不离形","单车巧和车炮双士","3rka3/4a4/2Rc5/9/9/9/9/9/9/4K4"],[509,"驽马困厩","单车对车马双士","n2rka3/4a4/9/9/9/9/9/9/9/1R2K4"],[510,"守正嫉邪","车双相和车炮","9/4ck3/9/9/9/4R4/9/2r1B4/9/4K1B2"],[511,"内外俱安","车双仕和双炮","9/4ck3/9/9/3R5/2r6/9/5A3/4A4/4K4"],[512,"单车肘士","车卒和单车","4k4/4a4/4r4/9/9/9/9/3R1A3/3K1p3/9"],[513,"收兵罢战","双卒对双相","4k4/9/9/9/9/2B6/9/1p2B1p2/5K3/9"],[514,"攻围难克","双卒对双相","4k4/9/9/9/9/2B6/9/4B1p2/5K1p1/9"],[515,"轻财爱士","","4k4/9/9/9/9/9/9/3A2p2/3pAK3/9"],[516,"将士离心","","5k3/9/9/9/9/9/9/9/2p1K1p2/3A1A3"],[517,"匹马嘶风","马相兵和单车","4k3N/9/1r7/9/9/9/4P4/4B4/4K4/9"],[518,"三寇连兵","炮双兵和单车","3C5/2PP5/4k4/9/9/4r4/9/9/3K5/9"],[519,"长生不老","炮双兵和单车","5k3/9/9/3PP4/9/9/6r2/4C4/9/4K4"],[520,"三灵不昧","双炮兵和单车","3C5/2CP5/4k4/9/9/4r4/9/9/3K5/9"],[521,"腹背无患","车相巧和车炮","9/4k4/9/9/9/9/1c2r4/BR7/3K5/9"],[522,"易马隐树","马双兵和单车","4k4/9/4N4/3PP4/9/9/6r2/9/9/3K5"],[523,"勒兵固守","炮双兵和单车","3Ck4/3PC4/9/9/9/4r4/9/9/3K5/9"],[524,"一鸣惊人","炮双兵和单车","4k4/9/9/4C4/4PP3/9/5r3/9/9/4K4"],[525,"鼎足三立","三兵巧和单车","4k4/9/9/4P4/4PP3/4r4/9/9/3K5/9"],[526,"不敷自保","车炮巧和车卒","3k5/9/9/9/4R4/9/9/9/3r1p3/4K1C2"],[527,"守株待兔","车和炮双卒","3c5/3k5/9/9/4R4/9/9/9/2pp5/4K4"],[528,"孤军四战","","4k4/9/9/4p4/2N1r4/9/9/4B4/4K4/9"],[529,"固守无虞","炮双相和单车","4k4/9/9/9/9/4C4/6r2/4B4/9/4K1B2"],[530,"朽索御马","马双相和单车","4k4/9/9/9/9/6B2/4r4/4N3B/9/4K4"],[531,"固守邦基","车和炮双士","3ck4/4a4/3a5/9/4R4/9/9/9/9/4K4"],[532,"水中摸月","车和炮双士","3c5/2R1a4/3k1a3/9/9/9/9/9/9/4K4"],[533,"三教皈一","单炮巧和三卒","5k3/9/6C2/9/6p2/7p1/9/7p1/9/4K4"],[534,"一马化龙","","4k4/9/9/9/9/9/8p/5K3/4pp3/3N5"],[535,"华山隐士","","3c5/4a4/C3k4/9/9/9/9/3K5/4p4/9"],[536,"息马论道","马炮对马卒","5k3/9/9/9/9/9/3n1N3/4C4/4p4/5K3"],[537,"子不离母","炮对炮双士","4ca3/9/3ak4/9/9/9/9/3C5/3K5/9"],[538,"二相扶国","双相对双炮","4c4/3c5/4k4/9/9/9/9/4B4/3K5/6B2"],[539,"独占中原","","5k3/4R4/4cr3/9/9/9/9/9/9/4K4"],[540,"一心定国","车和车卒","9/3k5/9/3r5/4R4/9/9/9/4K4/5p3"],[541,"鸳鸯交颈","双马和单车","4k4/9/9/9/9/4rN3/9/4N4/3K5/9"],[542,"野马脱绊","马炮巧和单车","4k4/9/9/9/9/6N2/9/3K5/4r4/3C5"],[543,"固前遮后(双炮巧和单车）","","4k4/9/9/3r5/9/3C5/9/9/3K5/3C5"],[544,"狐假虎威","单炮和双炮","4c4/9/2c1k4/9/9/9/9/9/3K5/3C5"],[545,"居中秉权","单炮守和马卒","4k4/9/9/9/9/9/3nC4/5K3/4p4/9"],[546,"懒散无拘","单相和炮卒","4k4/9/9/9/9/9/9/4B4/3cp4/5K3"],[547,"孤犊望月","单仕和单卒","4k4/4a4/9/4P4/9/9/9/9/9/4K4"],[548,"彼此无碍","高兵和炮卒","4c4/3k5/9/6P2/9/9/4p4/9/5K3/9"],[549,"两不得济","单兵对炮单士","4c4/3ka4/9/3P5/9/9/9/9/5K3/9"],[550,"孤雁折群","单相和马","4k4/9/9/9/9/9/9/B4n3/9/3K5"],[551,"势不两大","单马和单炮","2c6/4k4/4N4/9/9/9/9/9/9/4K4"]];   // [局号, 局名, 附注, FEN 局面]
+const SOLUTIONS = {"1":{"l":[[-1,1,"45056647313040302920022005002042122030317150"],[0,4,"40412921414271504252123152513143515221515242054542325131"],[1,15,"51714232717220427242"],[0,2,"5041313040302920022005002042122030314737"],[3,3,"314130412920022005002042122041304742"]]},"2":{"f":"C3kab2/4a4/n3c1n2/p2Np1p2/1R4P2/1R7/P3P4/4B4/2Cp1p3/c1rAK1N2","l":[[-1,1,"141041301011304128200210202841301141504133214050155542525552415228585241695741525776524176554152554352414362505162435150435541525563524163715051715251526454"],[0,9,"3321404121421031113141311511313211123231422331411211"],[0,7,"20224130332140412142"]]},"3":{"l":[[-1,1,"60503050314140304140303113331433042331321222323115111011221231320502"]]},"4":{"l":[[-1,1,"34223031191131322333324222434252436452516472515272605251607251521112204244848987726452511242667842524152644351418444"]]},"5":{"l":[[-1,1,"61605051537251526062525162615152726452426443423261622042624224424636351443351433352333253638253323113231292131322141"]]},"6":{"l":[[-1,1,"4743415232424030513130316250313042323040504252414261405032524152435352415358415254445241365541525563524163554152557452417453415253325241615341525372524172514152517052417062"]]},"7":{"l":[[-1,1,"737156517151585111213141834342244349244248394224374824424857422427462442462542242544244244324224324424424463422421314140313040416342414222324241394824423242"],[0,32,"4050634224423040"],[1,34,"51414959"]]},"8":{"l":[[-1,1,"60405152405041503132204232425242444342414342413142323132232232312232"],[0,2,"72602443515243645251647251527260525160725152726452424443"],[1,11,"604151524133"],[1,9,"40504150726052424443"]]},"9":{"l":[[-1,1,"8371504071524041523341517971515071705051332130412142413270505141864641423444"],[0,14,"4130705051414221"],[0,6,"02327971414033524050865648568980"],[2,8,"4142111232317172"],[0,6,"4131332131323433"],[0,6,"4142335442417971414071704041543341513321"],[5,8,"4232863648363433323179713041714131308980"],[5,8,"42528656485654335251797151508980"]]},"10":{"l":[[-1,1,"131041306452404110114142444342524353524253524252253352421112"]]},"11":{"l":[[-1,1,"2220422072320232777060421737322257362232364432224432"],[0,4,"1232171020427770"]]},"12":{"l":[[-1,1,"55504050113022207151504077704150515040415051"],[0,2,"4150113022207101201077475041014140504151"],[1,8,"423230425041014140304140"],[0,1,"11302220714140415551414051504041505141407770"],[3,4,"504177704150555040415051"],[3,4,"0141555040507770"]]},"13":{"l":[[-1,1,"62422442314140412921"],[0,4,"40303211"]]},"14":{"l":[[-1,1,"133241321410404115114142000232411112413212134241131141400200"],[0,2,"403032203031153541323532"]]},"15":{"l":[[-1,1,"74708270313040305150415021313031843432414333"]]},"16":{"l":[[-1,1,"124224421410304110198575740438390200413000305130191030110400"],[0,7,"74347578020041301910304131304030101330311333"],[1,8,"757919794757797051700200"],[0,6,"85657470656002004130191030411011413011216070003051302120"]]},"17":{"l":[[-1,1,"1210413051415041101902102720"]]},"18":{"l":[[-1,1,"79596252155552625565625205555262557562526555526255856252755552625515625285555262552562525952125215103041252050518981"]]},"19":{"l":[[-1,1,"0311303105012201113231323338324253434252385857374857"]]},"20":{"f":"2bak2r1/4aP2R/2R1b4/6p1p/1Np6/P1C5P/9/9/3pr4/5K2c","l":[[-1,1,"8180708022422425143348585958892942224132223280703272"],[0,4,"20421402"]]},"21":{"l":[[-1,1,"5150405063715040826140506142504042614050313050517163515230504150614050414741"],[0,12,"4130615350515372"]]},"22":{"l":[[-1,1,"2921313009393040214132415141403020321131321331111334113134423111423411313426311126381131385931116960"]]},"23":{"l":[[-1,1,"63606760735240413331414231414241523341423321"],[0,10,"4140332140411711"],[0,4,"405033305051303151501710"],[0,2,"404133314131735231415233"]]},"24":{"l":[[-1,1,"73614050885841525365524165574152577652417655415255435241435541525534524134534152533252416153415253345241345541525563524163514152513052413051415251725241725341525365524165574152573852412820"]]},"25":{"l":[[-1,1,"5141624187805054803046262507542420002414002014242000"]]},"26":{"l":[[-1,1,"827041506260504160644150706250413130413020304030627030315543313270513242644442528050"]]},"27":{"l":[[-1,1,"7570807085555262553562525852325230402140353011303930"]]},"28":{"l":[[-1,1,"51504050715150405150405025555040736182617770608255504050335234545260"]]},"29":{"l":[[-1,1,"333121315352735211322442035352734041314160525152324452514452515234547354535554356454"],[0,6,"313203535273404151506052"]]},"30":{"l":[[-1,1,"60504050665641525652715281515051314151504656524470604260625244564140"],[0,13,"62524456525163517060"]]},"31":{"l":[[-1,1,"5150405022204220615150516252415285555241715251526454"],[0,5,"616050516252415285555241715251526454"]]},"32":{"l":[[-1,1,"44524041131141421112424152334140124230413352403042324132153532413538413237483241183741323716324116354132352332412311"],[0,10,"5041335240501555"]]},"33":{"l":[[-1,1,"7170505147413041707151508270426021204130203038307141"],[0,2,"426070605051605051508270"]]},"34":{"l":[[-1,1,"171020025141404152514151606151524743"],[0,6,"41313312313060503240504030401220"],[0,1,"514140415251415160615152474358484348"],[2,8,"426417123240434152426162"],[2,4,"4131331231301737324012334032605030313312"]]},"35":{"l":[[-1,1,"4743504111414050414050513531224140505150313050513050"],[0,1,"3530223047435041114140504140505140505150233150511011"],[1,4,"42602342504111414050414050514050"]]},"36":{"l":[[-1,1,"2320242013324050625241524454524154584152574852416957415257765241765541525563524163715051715251524857"],[0,4,"40304434"]]},"37":{"l":[[-1,1,"101131301232413211104220102030310412314120404151626151521233324140415041004041324341"]]},"38":{"l":[[-1,1,"7080818073708070514140501510583841405051101151525453"],[0,4,"608251414050151058387030"]]},"39":{"l":[[-1,1,"8180827051504150806050416250"]]},"40":{"l":[[-1,1,"22213130212030404746274648463241464150418380"],[0,2,"31414746274648462042834342602131414043535041314132414641403041403031535131324030"],[1,10,"41314333"]]},"41":{"l":[[-1,1,"2545413254444050315150512230515044545040304232414261"]]},"42":{"l":[[-1,1,"07002100290749094729"]]},"43":{"l":[[-1,1,"636065603130505153724272014143414757"]]},"44":{"l":[[-1,1,"515040505251505114548454865654046353045453525150525150405141"]]},"45":{"l":[[-1,1,"51506050736150517570415070504041505141405131405031303830185866565545566661536656537456667462505162546656547556667556"]]},"46":{"l":[[-1,1,"22203031202131302141181947291929483929394149"],[0,6,"5241242030315143"]]},"47":{"l":[[-1,1,"038388874252415210505150835352413352"]]},"48":{"l":[[-1,1,"626030314423313223113231514150416030413063617051615130415141"],[0,10,"584849597051303751634333"]]},"49":{"l":[[-1,1,"11213130212030312838324147374132371732414836583817113132362404231112323124432342121131324324"]]},"50":{"l":[[-1,1,"272232413132423230113242112342322344324244634232634432427361"]]},"51":{"l":[[-1,1,"22203041535040502021505171615152005041502122"]]},"52":{"l":[[-1,1,"222002206160806013214050836260624353"],[0,8,"50514353"],[0,1,"616080602220022013214050836260624353"]]},"53":{"l":[[-1,1,"2320022001313031653532414737"],[0,2,"422065605041013130314737"]]},"54":{"l":[[-1,1,"1333223233324132053532415334413234153241152331302311304035304220113241323031"]]},"55":{"l":[[-1,1,"3040524140416241804042525453415304545374545752425141"],[0,10,"533454575242514142324030324255634252634452423040"]]},"56":{"l":[[-1,1,"19102420102026207379485879592029592958533130"],[0,6,"20297929482853522829393829593130"],[0,6,"2026415150517959"],[2,8,"5040314140303231"],[0,4,"02200900"]]},"57":{"l":[[-1,1,"625241522151325161604060242030411130"]]},"58":{"l":[[-1,1,"131041302520304120224130434260420343"]]},"59":{"l":[[-1,1,"08002002313040305232413277373241533263333220"]]},"60":{"l":[[-1,1,"827041504959776770625041625040505251"],[0,4,"404170624131625031415242"]]},"61":{"l":[[-1,1,"113130317150415077715041714131301210"]]},"62":{"l":[[-1,1,"73705250575041506360504160644150133233328343"],[0,2,"415063605041606441508343"]]},"63":{"l":[[-1,1,"514130410400413021715041003041301132"],[0,2,"404104444131112331324442"]]},"64":{"l":[[-1,1,"0100200238300220398986893039200239595859121189874748873711103730003007173031171131371117373817183833181633371617"],[0,10,"89591211594947374939374707371121"]]},"65":{"l":[[-1,1,"37305051476567657971515230504150717252514230"],[0,4,"20423060"],[0,4,"674765474130797151524230"]]},"66":{"l":[[-1,1,"31304130124220421132"]]},"67":{"l":[[-1,1,"61604150314140416061414284634232613110318030"]]},"68":{"l":[[-1,1,"5332043451504150325130405130"]]},"69":{"l":[[-1,1,"313040302120303115233132231132427563425272625251626151526151"]]},"70":{"l":[[-1,1,"51705250705140413931413151433132432232422234"]]},"71":{"l":[[-1,1,"3141504153324030322008006333304020324030321330401321"]]},"72":{"l":[[-1,1,"80614030031130316142415211233132234432314223313023113031445260421123313081805041526041502342303142233141234441516072"],[0,20,"42602311"],[0,16,"3141527141401132"],[2,18,"4142112342322344"]]},"73":{"l":[[-1,1,"114140415433414033214030214230404261404112334131555131305150303133123141615371521233413133523141523341313312"],[0,14,"3132615332425141"],[0,6,"40411220413155513130214230402032"],[2,10,"3132213332425141"],[0,2,"40304131304031304030544230404261"]]},"74":{"l":[[-1,1,"3134515234541454207048383938363738375434374734317078426445443101785852424443"],[0,2,"41322021515234144224142436372454524201023241212241322227"],[0,2,"14113454"],[0,1,"3136413220295859"]]},"75":{"l":[[-1,1,"275741525747524148574152474140415748"]]},"76":{"l":[[-1,1,"34333242355442415462415162435152436452516472514172534142333242526555"],[0,6,"41408580504165454152334330416270"]]},"77":{"f":"4ka1c1/9/3a5/9/6r1r/9/1RR6/4c4/3p1p3/C3K4","l":[[-1,1,"262040411611414209023241202241322223324111124132234342521213324143535242134342324333324253434252333252514353415253525141524241513231"],[0,16,"52511311"],[0,3,"2021414209023241161241321217324121224132222432411747644424448444474442324434"]]},"78":{"l":[[-1,1,"225250405242405042405040445240505271505171635150634250514230464006565141302241422234424134534142564642524757"],[0,24,"41515345"],[0,14,"50404230"],[0,6,"505144635152"],[0,4,"4642445240504757"]]},"79":{"l":[[-1,1,"333040300210422010223031224331324324323124123132122032312012313034223040122041302032404132244151244351520002"]]},"80":{"l":[[-1,1,"53524241525141406343403043403031401032411016475716364132653532413537413236563241565738393747"],[0,12,"313216363242364642326545"],[0,10,"47571011"],[0,9,"6561324151413132401032424151484959494748495948495958384858573747"],[0,8,"3040656050415150"],[0,6,"5041515040306535"],[0,4,"41316535324163334132514131413343"]]},"81":{"l":[[-1,1,"203010303130404130404140513240413220413120123141123341403321403063423031425031322113"],[0,20,"3130214230400545"]]},"82":{"l":[[-1,1,"5332403009392838555041503251"]]},"83":{"l":[[-1,1,"113130317152313252403231797131305750"]]},"84":{"l":[[-1,1,"2230422041515040302220421132"]]},"85":{"l":[[-1,1,"51504050425241528362505162708160826351507062"],[0,11,"637150518081"]]},"86":{"l":[[-1,1,"51414041594964424837422039482042324241314939"]]},"87":{"l":[[-1,1,"70505150611130411116151602121626394958563747263622215646"],[0,13,"47413637"]]},"88":{"l":[[-1,1,"5150404155514142504042324060464701414858515878585958474160204111202511142535324235454232584814348584"],[0,7,"404648585158787987697969"],[0,5,"506048495949464749394749"]]},"89":{"l":[[-1,1,"515040508371504084806042715240505260505125557655262132410656557660525152645476555453525153525150525150405150"],[0,18,"76555271"],[0,16,"55346052345352715361645461538081"],[0,11,"2521324121413041607251500600413072605051262130412141"],[3,18,"11307260505100014132262132412141"],[0,8,"40412521"],[0,6,"4041252141420602324126224132214142412221"],[6,14,"30412223"],[0,2,"4041252141420602324126224132214130412223"],[8,10,"42412221"]]},"90":{"l":[[-1,1,"31521252132140412133414011415041332140500555"],[0,8,"30413321403075354132353252320535"]]},"91":{"l":[[-1,1,"536158516050415065455041314140304140303115233132403012312344"]]},"92":{"l":[[-1,1,"8280415031413041131041300221"],[0,6,"20020100"],[0,4,"4041022108011311"],[0,1,"3141304113104130828040411011"],[3,2,"4041022108011311"]]},"93":{"l":[[-1,1,"51503031152303225351313250302230513133312344"],[0,8,"33302344"],[0,4,"31415351"]]},"94":{"l":[[-1,1,"434250414432405042524152735352418362"],[0,8,"72531151"],[0,2,"20424432"],[0,2,"3041443240307333"]]},"95":{"l":[[-1,1,"626151506160505116565556191141324741"],[0,4,"5040332140304737"],[0,1,"165611324741515062616482615132514140"],[2,2,"51504741644241425556424050516261"]]},"96":{"l":[[-1,1,"7361555103004220437362437377373833384838393851617773616673716636384836314858"],[0,6,"41324448"],[0,2,"5051030042203330"],[0,1,"0300422043536243736150513330"],[3,4,"41527361404161424151333130413141"],[4,6,"5051333040413040"],[3,4,"413244486241735250513332777947694153323040413040"],[6,6,"5545736140415350777947694548504041313332"],[6,6,"3241736150513330"]]},"97":{"l":[[-1,1,"806163518380848031414041565141516153"],[0,8,"4140513140504454"]]},"98":{"l":[[-1,1,"030041301310304110124130513240410001"],[0,4,"4041000141425163423263443242442342525453"]]},"99":{"l":[[-1,1,"171018107370505162615152705041503151"]]},"100":{"l":[[-1,1,"85557252555241521353524142525152636252510252"],[0,3,"0201515055524152135352414252"]]},"101":{"l":[[-1,1,"7030888000201525308025208020"]]},"102":{"l":[[-1,1,"81804260131002208060415060504050615150400141"],[0,2,"41508050405061515040134330415141"],[1,8,"42200141"]]},"103":{"l":[[-1,1,"5150405082524152837150518072"],[0,4,"50408061"]]},"104":{"l":[[-1,1,"333152411132474231415152414260423244525144635141637141400500"],[0,12,"51500500"],[0,12,"51526371"],[0,4,"5152324452514463515205024742024260426371"],[3,9,"637152420545"],[0,2,"474111325150050041400040"]]},"105":{"l":[[-1,1,"57504050747050518472515270504150373242244742"],[0,8,"81517260"],[0,4,"42607060505184725152606252513731"],[2,7,"37314132474151526062"]]},"106":{"l":[[-1,1,"314140504140505125215152635374532151525175635152405080506371525189815361716351526344"],[0,15,"47575345637152518981"],[0,13,"6371525189815361716351526344"]]},"107":{"l":[[-1,1,"10113031113132318463514135456442454260423343422443482442476942245947244247354224354324424322"],[0,2,"5241355532528463"],[0,2,"50413353"]]},"108":{"l":[[-1,1,"5150405061515040515040503757504033524050527350407361"],[0,11,"527150405750"],[0,4,"5051375741525752"],[0,3,"3757504033524050616050515271"],[3,8,"42605271"],[0,1,"51413041335240500700"]]},"109":{"l":[[-1,1,"25203041206074796069797069657080655550402120"],[0,4,"88784383"],[0,4,"745460615051437354747353"]]},"110":{"f":"3akaP2/9/4bR3/4p3C/7N1/9/3p1p3/4B4/3rAp3/c1BAK4","l":[[-1,1,"525040417453413150513041514131328343"],[0,6,"31328343422443453242533442324535"],[1,8,"090343330353333853333858"]]},"111":{"l":[[-1,1,"313040300434304034304030031130400700"],[0,4,"123203113040070032303430"],[0,4,"4132031130310701"]]},"112":{"l":[[-1,1,"7152415239304030010020021510"],[0,2,"405081515040514140411511"]]},"113":{"l":[[-1,1,"615150404743644251413241114140304140303140303130635130316761"],[0,4,"4030113130314333"],[0,4,"4152514140506371"]]},"114":{"l":[[-1,1,"73614050895982525952415212313041252050513123413020213041214151412311"],[0,14,"52412141515241425251231130414241"],[0,14,"51506142524101005051426351522122"],[2,16,"5040010030412120413020304041303141404230"]]},"115":{"l":[[-1,1,"313040302311304033214030214230404221403051503031112331325030413023443231445264426961304161413130414030314030313021423031422331302311"],[0,32,"3141234441514757514152334140445240305737"],[1,33,"5260415160725141725341402342"],[0,12,"4150213330313312"]]},"116":{"l":[[-1,1,"73524030883841324535324124344132344432412520022035654132153532416560"],[0,11,"35854132858050415260727025200220153530406052"],[1,16,"415038323040605240412521"]]},"117":{"l":[[-1,1,"157570751710200231304030323130403130"]]},"118":{"f":"C4a3/3k4C/2R2a3/2p1pPN2/9/9/2P5P/1cn5B/2p1App2/4KAB2","l":[[-1,1,"222131300050"]]},"119":{"l":[[-1,1,"7141524131414030625042605031263631103637102203220900"]]},"120":{"l":[[-1,1,"51504050003022306371505145554656553556463531"],[0,3,"637150514555465655355646353130310050"]]},"121":{"l":[[-1,1,"515040506371504082614050614250404261405031304130615350515372"],[0,12,"5051716351523032"]]},"122":{"l":[[-1,1,"08004130003040307251304009004041676141515352514152424131423231320030"],[0,15,"424131320030"],[0,14,"60420001"]]},"123":{"l":[[-1,1,"435354534740505171615152404220421031304107024224311224421233"],[0,14,"41321233"]]},"124":{"l":[[-1,1,"21111202625250416142"],[0,4,"4858645450416142"]]},"125":{"l":[[-1,1,"71705051112341322331324131104132707151500100422010222042223042207170"]]},"126":{"l":[[-1,1,"4353415253635141636141404452"],[0,4,"5241636151504452"]]},"127":{"l":[[-1,1,"54506050314140304131303102233130231130317371"],[0,2,"405073535040314140304131303102233130231130315351"]]},"128":{"l":[[-1,1,"3141304161414030625042604131304082615651574740503130"]]},"129":{"l":[[-1,1,"113123311510311041113040191038305132"]]},"130":{"f":"4k3C/c4P3/4N2c1/r6P1/4P2P1/9/4n4/3p5/4p4/3KC2N1","l":[[-1,1,"4250727050717073715073705071707471507470507170794946403071507970507130317152313280827072523372754636324244434252435352513656755553525150525150405141403056365535335201314131"],[0,24,"323146367232331232224434"]]},"131":{"l":[[-1,1,"515040507462504062708160826140507062608161425040625040503930"],[0,14,"81604261"],[0,5,"8261405061425040625040503930"],[0,4,"81628270"]]},"132":{"l":[[-1,1,"33527151424150418180415022424030292030314240"],[0,7,"222040418081414229221132223242322022"],[1,8,"1130203040302920"],[0,2,"415222201130203040302920"],[0,2,"4030222030312921"]]},"133":{"l":[[-1,1,"5350405083715051314162412230"],[0,4,"504031304130715240507353"],[0,2,"62503141"],[0,2,"41503130"]]},"134":{"l":[[-1,1,"3220181082325332833332203338203237483244563544323514321314331332335232515231"],[0,16,"133433523442483742344131"],[0,15,"483713321422"],[0,10,"3253563553343514341314331332335232515231"],[0,10,"322456352436354336174322"]]},"135":{"l":[[-1,1,"83715040132140301020303171525442141131324333"],[0,8,"4152141131327252"],[0,2,"5051133241327252514114444131715031301020"]]},"136":{"l":[[-1,1,"7470517013435041314130411210"],[0,2,"50413141404112114140022140502142444211515040131030415150"],[1,4,"304112104130022140501030"]]},"137":{"l":[[-1,1,"3644304043422242445240417071"],[0,4,"2342445240417071"],[0,2,"324143333040333040304432"],[2,6,"4130"]]},"138":{"l":[[-1,1,"3152404152718881373141315351304171503132777242245152"],[0,12,"4152513181314342"],[0,8,"31327772422471522442433313335244"],[2,11,"434232427152"]]},"139":{"l":[[-1,1,"555241525952504052424642445240504757"],[0,6,"4050424050404452405047574656523150403110404110224140223040416553"]]},"140":{"l":[[-1,1,"57504050616050516254685854425859426351526344525144325152324452513141"],[0,14,"2442314151523244"],[0,8,"58684757685842635152634452515747585944322442314151523244"],[2,18,"5152324452513141"]]},"141":{"l":[[-1,1,"7270426070604150605040506151504011413041154541300141"],[0,2,"41507050405061515040154530411141"]]},"142":{"l":[[-1,1,"82804260014140415351414215234232513110311222"]]},"143":{"l":[[-1,1,"256560807161415061608060656030417770"]]},"144":{"l":[[-1,1,"333041307747422464445041444140504757"],[0,4,"30415332"]]},"145":{"l":[[-1,1,"20251022254540301636"]]},"146":{"l":[[-1,1,"06361132363241320535324124344132344432415332313235383242444342523858"]]},"147":{"l":[[-1,1,"1242304133214030423241321434324134384132371832411837413237163241163541323523324123354132354332414335413235543241543341323352324121334132331432411422"]]},"148":{"l":[[-1,1,"313441322021524134145150141050511040515221234224235352420121"],[0,9,"2126"],[0,2,"41302021"],[0,2,"141120402627404151503430"],[3,6,"52413454"]]},"149":{"l":[[-1,1,"5343423254524152404224424333313304343343343843333748334329374333372533432533"]]},"150":{"l":[[-1,1,"75705041707141501141404152514151848151528050524222324232233332423332"]]},"151":{"l":[[-1,1,"050030411410413010113041212041305150405020304240304050401110404165534151533251520002604272625251626151523240"],[0,26,"51411011"],[0,20,"51413220415110115152726252421112"],[0,1,"574842520545374714443041444140302131"],[3,2,"7848515040410501"]]},"152":{"l":[[-1,1,"1141304119104130514140414553414024203041202241305332"]]},"153":{"l":[[-1,1,"47403040002140300737324148364132362432412432"]]},"154":{"l":[[-1,1,"75705051797151527172525170715150725241527170505184725141704041407260"],[0,2,"426070605051797151527172525184636563606151507270"]]},"155":{"l":[[-1,1,"12422042613150411410415280614050313050518481"],[0,6,"4050313050518072"],[0,6,"41328061405031305051848151523050"],[0,4,"4464144442608481"]]},"156":{"l":[[-1,1,"7970826070604260212030316333453320304130221028201121"]]},"157":{"l":[[-1,1,"8380415053434260634230418060696042614030031130314303"]]},"158":{"l":[[-1,1,"353040300210422010223031220331320311"],[0,2,"42200221"]]},"159":{"l":[[-1,1,"57504050637150407152405087574656455535555755"]]},"160":{"l":[[-1,1,"6560426073523251313040301910"]]},"161":{"l":[[-1,1,"0333324102323132434232314232"],[0,2,"3141434241513353"]]},"162":{"f":"2bakab2/5RP2/7P1/2N6/9/9/9/4Cp2C/r3p4/5K3","l":[[-1,1,"234230415150405061605051426351528782"],[0,3,"51415041878060426160"],[1,4,"4030414030314030"]]},"163":{"l":[[-1,1,"22323132433332315141313053321131413130403343426081416042313040304333"],[0,2,"7232433332225141"],[0,1,"514131302232723243333222533211314131304033434260313040304333"]]},"164":{"l":[[-1,1,"436232628454625254524152215150511353"]]},"165":{"l":[[-1,1,"676068604765606577376535333235373231503151313731111002201020"]]},"166":{"l":[[-1,1,"21203230203040305150303107374132505131303422"],[0,9,"503031303422"],[0,6,"41500737"]]},"167":{"l":[[-1,1,"8380426053504150445240301131"],[0,2,"78701141404153514140515040415051"]]},"168":{"l":[[-1,1,"79704150656050416067415067473041705040508180505147574152566452416443"],[0,16,"5141574741516472"],[0,15,"564451418081"],[0,8,"314170504050818050514757"]]},"169":{"l":[[-1,1,"6250423234333833013112316562"],[0,6,"3231403031306560"]]},"170":{"l":[[-1,1,"4151815132422442253373432722"]]},"171":{"l":[[-1,1,"52604240604140464160464060414047416047406041404841604840783828386041"]]},"172":{"l":[[-1,1,"8162504062705250705150535170535070515059517059506929"],[0,2,"50516270"]]},"173":{"l":[[-1,1,"515041505850404150404131422331324030"],[0,6,"41404743"]]},"174":{"l":[[-1,1,"858062603130413034304030633330407343"],[0,6,"40416361"],[0,2,"42603141"]]},"175":{"l":[[-1,1,"232132412141514152334142335442415462414262504241303141408980826050626042314140306250426050316042311009001022"],[0,26,"42201022"]]},"176":{"l":[[-1,1,"2721524160685150685850404859807021114220111041305838"],[0,13,"10204748"],[0,1,"604080702721524140415150"]]},"177":{"l":[[-1,1,"810108187370303174713132711118117072"]]},"178":{"l":[[-1,1,"31414030623238324140"],[0,2,"50416260715060504150656050415150"],[1,4,"4150605071506560"]]},"179":{"l":[[-1,1,"64545141624241425452424152514142202242322202"],[0,6,"42522022"],[0,4,"4131545131304240"]]},"180":{"l":[[-1,1,"21203031625052402021313050423241573738375850"]]},"181":{"l":[[-1,1,"3352715137304041523341423040504140415141335442528555"],[0,2,"40415271"]]},"182":{"l":[[-1,1,"848050416260415063826760826140418081"],[0,6,"677760615041827041507051504161604150513240416061"],[0,5,"6342"],[0,1,"84443041634220426267"],[3,4,"67624221"],[3,2,"423263423041426140306267"],[3,2,"42526342504142214050445452326252"]]},"183":{"l":[[-1,1,"373040412131415125215152305052428000"],[0,4,"414230404252405052428000"]]},"184":{"l":[[-1,1,"7970426070608260838060426250426050316042311002001022"]]},"185":{"l":[[-1,1,"62608260637101716960505160615150848070516160"]]},"186":{"l":[[-1,1,"525141401110021051414041171141401910"]]},"187":{"l":[[-1,1,"89805051808151501110414023313241818050513143024201413041808151524364"],[0,14,"51418081"],[0,12,"40438050"],[0,4,"5152234452428182"]]},"188":{"l":[[-1,1,"73704150707150416360415071413041606142606141403041403031222131324030"]]},"189":{"l":[[-1,1,"17576757895957586141"],[0,4,"3848493948585957"],[1,5,"49485758"]]},"191":{"l":[[-1,1,"636050412120303173331333202131302141"],[0,3,"733330402120"],[1,4,"13332141"]]},"192":{"l":[[-1,1,"81607870514130416052"],[0,4,"40506052"],[0,2,"4150534342646072"],[2,3,"605250415150"],[3,4,"787051614041808170716171"]]},"193":{"l":[[-1,1,"845450408280426080604150605040415051414054443041444140305150"],[0,10,"41425452"],[0,2,"415282525040525040415451"]]},"194":{"l":[[-1,1,"4241313241311231524030418482"]]},"195":{"f":"2bk1a3/9/3a5/7N1/9/9/C7C/1p7/1np2p1r1/4K4","l":[[-1,1,"8680504106363040735240503656"],[0,2,"30317352"]]},"196":{"l":[[-1,1,"616050516050415062705141034341311121"]]},"197":{"l":[[-1,1,"63513241193930405170535070625052393040306250"]]},"198":{"l":[[-1,1,"514162413130403032421333031130315051"]]},"199":{"l":[[-1,1,"715150403141524151414050414050514463"],[0,6,"403041403031442331324030"]]},"200":{"l":[[-1,1,"3330413001515051625251526544525144635150637150518381"],[0,10,"51526371"],[0,6,"51508353"]]},"201":{"l":[[-1,1,"60504050656050516961515261625251606151506252415261515051845452414555"],[0,13,"616050518454"]]},"202":{"l":[[-1,1,"735240505260504060524050777050517071515052735040736140415323413161423041423427233446"]]},"203":{"l":[[-1,1,"23333231853541323332314132424151355552414252515255585242132142325838"],[0,8,"414013324050355552414252"]]},"204":{"l":[[-1,1,"3932424121314140324264422028070028484264654764424729426429476442476942646987001063534050535210113130"]]},"205":{"l":[[-1,1,"724230417352403075703031423231327072644243423231423231307270"],[0,2,"6442736140417571"]]},"206":{"l":[[-1,1,"864642322333323146364132334331414342415136565241425251525659"],[0,10,"414013214050365652414252"],[0,8,"3241133231324333"]]},"207":{"l":[[-1,1,"634230418353504042614030535041507470504161404150405250412131123152404150403250413211"]]},"208":{"l":[[-1,1,"122232420343425283715251040141522221304171635150010041306342504042304050434050403022"],[0,20,"5051407051410001"],[0,18,"5241302220422120"],[0,16,"5051423051504340"],[0,14,"20422120"],[0,8,"4132222130414353"],[0,1,"03333242334342528371525104014152121130417163515001002042111041306342505142305150301150511132"],[6,14,"4130634250514230515043405051407051410001"],[6,4,"42321222323143334132223231418362414033433041434140303231"]]},"209":{"l":[[-1,1,"313040300311303111323132243414353433"]]},"210":{"l":[[-1,1,"434162415332403076364133325133412232304036464153324253414241403041453031453531415143"],[0,17,"41113040514340301131"],[1,19,"513240304636"],[0,16,"40415143"]]},"211":{"l":[[-1,1,"142241318535153522413132898242645052604252423242416264827172"]]},"212":{"l":[[-1,1,"73613241614041324052314110114142878242527172"],[0,2,"50416142"]]},"213":{"l":[[-1,1,"797042602220022070604150645240415233413160613041614150413312313284343242344442321220"],[0,20,"4252123352514454"],[0,16,"31308480"],[0,12,"313284822042824232426162"],[0,10,"4140332140416061"],[0,10,"41426062"]]},"214":{"l":[[-1,1,"332171211242504181210717420200100272"],[0,6,"40504262"]]},"215":{"l":[[-1,1,"8747422063442042442342243631414023445041314140504140505144635152404224423732"],[0,9,"2342504131414050414050514263"],[1,10,"26454261"],[0,5,"4432422436466442462642602646604246564260565141423244"],[0,2,"42606344"]]},"216":{"l":[[-1,1,"73704150707150416960415060615041717041506141"],[0,7,"60625041717041506242"]]},"217":{"l":[[-1,1,"828041507170504170794150796917196919272819103041514140418081414081312838313848383938"]]},"218":{"l":[[-1,1,"644443448242444283805041656041503141"]]},"219":{"l":[[-1,1,"6160505160501050627050606461515061605051603000703141"],[0,12,"72703141"],[0,6,"72706461"],[0,4,"4150627072706461"]]},"220":{"l":[[-1,1,"6452415221111011422140304333"]]},"221":{"l":[[-1,1,"0001313201023231707141527361524102323132615332425334423227371535345332425361"]]},"222":{"l":[[-1,1,"2243515214124132433130411050705012325251311041320801515211123241102241322230"],[0,16,"525110313241314351520102"],[0,8,"524212324132080232411112"],[0,2,"515010304130080030411110"],[0,2,"53431454"]]},"223":{"l":[[-1,1,"0141304148574030191030310803"]]},"224":{"l":[[-1,1,"616050516050415062707970696121611130"]]},"225":{"l":[[-1,1,"1131303122323132343332313332313032313040313040506151505175635150637150518881"]]},"226":{"l":[[-1,1,"83804150734352414241404180814140344250418141"],[0,4,"403034223031221031308050"]]},"228":{"l":[[-1,1,"62524241524241316361313061603031423231413242413109394838644438394232"],[0,10,"313260303242534342416444"],[0,4,"41425343424143424131643432416333"]]},"229":{"l":[[-1,1,"515040306560303104233132615346436062"]]},"230":{"l":[[-1,1,"353050304641405041405051405051502331"]]},"231":{"l":[[-1,1,"515040504353504033524050527150405350"],[0,7,"527350407361"]]},"232":{"l":[[-1,1,"05353237223441323453324153323132353837474837"]]},"233":{"l":[[-1,1,"515041508343504131304030093930404221"],[0,2,"4050313050518353"]]},"234":{"l":[[-1,1,"8555585523423241111050514263515263445251252141304432"],[0,4,"5040254532411141"]]},"235":{"f":"2bk5/r3aR3/n1r1b4/9/9/6R2/9/3n5/4p4/1C3K3","l":[[-1,1,"6560303151413141606141401910"],[0,1,"19103031514131416561"]]},"236":{"l":[[-1,1,"533240504447"]]},"237":{"l":[[-1,1,"7570604263604150314152416050"],[0,6,"40416061"]]},"238":{"l":[[-1,1,"14113132111232317071415273615041123231326153"]]},"239":{"l":[[-1,1,"7352215179715152713130412343"],[0,4,"30417151415251211727234342242124273724343738343848383938"],[1,7,"51111727111857582303422003092737182840300908373808385859"]]},"240":{"l":[[-1,1,"13324030321130403321403021423031425062506561"]]},"241":{"l":[[-1,1,"553538356544323144233130171020020100"]]},"242":{"l":[[-1,1,"8480404161514151757151526362524280826452625242527872"],[0,2,"5041757041507050404178714142505242526362524280826452625242527172"]]},"243":{"l":[[-1,1,"61515051131151501151505143415150415150510353"]]},"244":{"l":[[-1,1,"21311231878141402720304120214130814143412120"],[0,2,"41311011313211123231121131328737"]]},"245":{"f":"2ba1k3/4a4/9/9/9/4R4/3r5/2C1B4/3r5/2B1K3R","l":[[-1,1,"45554152476536462747464255544232898050514740322280815150402030412907224249594248818050512021413254525141525141428082"],[0,20,"3848818050512040"],[0,12,"3242495942228081515054742229404950407470"],[2,14,"424854525141525141428082"],[0,6,"3041555446368980505147433646495946435474"],[0,4,"36322757383949483242554552414542398942525040522220425707405065478982070282884849426402005051226288840001415262615150616050516030644230315150313284440108524132124264084844544841"],[0,4,"38394948364627473932898050515554463647373637808151505474"],[0,2,"504089804150805040415051414055453041454140305150"],[4,12,"41325474"]]},"246":{"l":[[-1,1,"2720303120213130476567656460656021203031424150412060"]]},"247":{"l":[[-1,1,"2120303156360232363241320737133337346482666548385949"],[0,8,"32415334"],[0,2,"30405361"]]},"248":{"l":[[-1,1,"6061515061414741"]]},"249":{"l":[[-1,1,"4443424143424131423231326636324289492858472942522907"],[0,10,"282647294252363252512907"],[0,4,"4142664642528959"]]},"250":{"l":[[-1,1,"35315150313050513050515012315051315251524353"],[0,5,"435351411233"],[0,4,"60301231"]]},"251":{"l":[[-1,1,"6342304151413241426140508959"],[0,2,"07474250"]]},"252":{"l":[[-1,1,"25203220262041303352404120214142212242415233"],[0,3,"332140302636"],[0,2,"413033523251203040302620"],[2,6,"40412646"],[2,4,"404120214142050232242122424152334151"],[4,12,"4131222131323312"],[4,12,"41402646"],[4,12,"243226464151222150414656"]]},"253":{"l":[[-1,1,"63715040536140506173504087804150735240418081"],[0,5,"6142504042614050617350407352"]]},"254":{"l":[[-1,1,"75634252115170518050"],[0,3,"634452424432"]]},"255":{"l":[[-1,1,"2120303128213132203032423040423221283828294737474020281820303242303818193828424149394737282657472646415139491929465651414959293956464131"],[0,17,"493918283020281820404252394952514043182843535141535747484959283857474131"],[1,18,"1819304042523949192940202919205052425057"],[0,5,"21223231202131302232304032424030212838282947374742222818223230404939182832222818224240503949"],[3,16,"57474232"],[3,12,"405021315758425250405258"],[5,14,"4748424838484948"],[5,14,"384849395758425250402947483839495848495938395242"]]},"256":{"l":[[-1,1,"3230404137314142311118113032"],[0,6,"484939491811304011414060423260674146675746440109443447293444495944460907464407474446575546365545"],[1,12,"41516067515301085333676642324769"]]},"257":{"l":[[-1,1,"434232314241313082326042474258684151685842403031514131324030"],[0,8,"5848424838484948"],[0,6,"3832414030314741"]]},"258":{"l":[[-1,1,"3858685822625857626057507161"]]},"259":{"l":[[-1,1,"253530402949"]]},"260":{"l":[[-1,1,"4140304082424030423230407545"],[0,2,"3031828131324030"]]},"261":{"l":[[-1,1,"02324241324241311636"],[0,4,"4142625242321636"],[0,4,"41514252"],[0,3,"323141311636"],[3,4,"4140335240501656235331305051626151413040"],[0,2,"4232163632426252"]]},"262":{"l":[[-1,1,"717241524423424172714140203040307170"],[0,8,"405023425241717050514263"],[1,10,"1141304050407170"]]},"263":{"l":[[-1,1,"818041507370504170764150424140417646"]]},"264":{"l":[[-1,1,"28226042224252421123425223445242446342523151"]]},"265":{"l":[[-1,1,"324244423730404121314151626151523050"],[0,2,"2042"]]},"266":{"l":[[-1,1,"4340303140303130833332415332"]]},"267":{"f":"3C1a1c1/9/C2kbN3/4P4/9/9/9/9/r4p3/4K4","l":[[-1,1,"434232314241313252317030311208021224"]]},"268":{"l":[[-1,1,"4741524137574152575251526353525107571555535251505251"]]},"269":{"l":[[-1,1,"774740304740303179715241403031305150"],[0,6,"313240423242717252416062"],[0,4,"30407970"]]},"270":{"l":[[-1,1,"2120303122213132213132310012313220223231222431321220"],[0,12,"31302420"]]},"271":{"l":[[-1,1,"6342224265605051314142414757"],[0,6,"30414757"],[0,2,"3041656050514757"],[0,2,"50516561"]]},"272":{"l":[[-1,1,"434030316351504140415241514331308180"],[0,8,"31324324"],[0,4,"5241514331324324"]]},"273":{"l":[[-1,1,"12323141323141311535"],[0,4,"4140335240501555"]]},"274":{"l":[[-1,1,"2120303120304130221029201121"]]},"275":{"l":[[-1,1,"6342304142214030438320218380303180814132812150417333"],[0,11,"73713241717841328121"]]},"276":{"l":[[-1,1,"4131303165613132535232426762"]]},"277":{"l":[[-1,1,"83715040736140306142303171503141506241514230"],[0,10,"41314250"],[0,4,"4041615341317150"],[2,6,"4140533240418581414271504241506241313251"]]},"278":{"l":[[-1,1,"7770505170715150714142415752415152515040817148467161464551504041615141315020454420253132255544465141324241314232555146475141"],[0,21,"202131322141"]]},"279":{"l":[[-1,1,"59500728495928165080"],[0,4,"0609161981735080"],[0,2,"4050165650404959"]]},"280":{"l":[[-1,1,"7361686951596961595040507570"]]},"281":{"l":[[-1,1,"515040503930505142635152637152518581"]]},"282":{"l":[[-1,1,"5767403051503031422331325052"],[0,2,"413262608260676050415150"],[0,2,"4152626050416070403066603031422331327072"],[2,4,"826051504041666141425052"],[0,2,"3848626082606760"]]},"283":{"l":[[-1,1,"37312627311110115111504173614050111362744757"],[0,10,"5051136362814757"],[0,2,"30414742"]]},"284":{"l":[[-1,1,"0131323173614030191002201020"],[0,2,"32373137473759485848191837381838483839384132736140416142022042634140634450414423403023043040041220024333"]]},"285":{"f":"r4k3/4a1P2/1n3a3/4N4/9/9/9/4C4/4p4/2BK5","l":[[-1,1,"43311231615150514757"],[0,1,"6160504060504050436250514757"]]},"286":{"l":[[-1,1,"635170503932"],[0,2,"70725172"]]},"287":{"f":"2bk1a2r/4an3/cR2b3N/p3CR3/1C2p1P2/9/4Pp2P/2c1B4/3pr4/2B2K3","l":[[-1,1,"5351020112320131323130311434313082618060515060504333"],[0,4,"304014102002514150411080405082704260706250514353413253553241808351526254"],[0,2,"4224515580825535823212324132353230401444"],[2,4,"2042553530401210"],[0,4,"413251313031143432414333"]]},"288":{"l":[[-1,1,"231180810363608273718171474362436360"],[0,6,"4847313041301132"],[0,4,"413031815041113241324743624373703041354378687060415060504050436250408180"],[2,14,"4030432210226333304070604150334342524348"],[2,14,"4150706032416070415281514030705042405131"],[2,12,"42527060525060504050354350404362"],[2,8,"405035546281737141325462504047433241434842486360480860801022717041507050"],[0,2,"786831304130113240417371"],[0,2,"807073706270474348183130"],[0,2,"4246313041301132404173714142352342527151"],[9,10,"42327131"]]},"289":{"l":[[-1,1,"334308183130413034425051426351417071"],[0,2,"5040706041503141"]]},"290":{"l":[[-1,1,"313040305150303142233132616220424742"]]},"291":{"l":[[-1,1,"0555273755504050608070517170"]]},"292":{"l":[[-1,1,"2546134346674333674833434869433359473343475543335543"]]},"293":{"l":[[-1,1,"4959825217271121472521252747"],[0,1,"17271121472521222747"]]},"294":{"l":[[-1,1,"736140305341826180506140833322201311"],[0,2,"826153614030833322201311"]]},"295":{"l":[[-1,1,"797562542232313075705462515062701321"]]},"296":{"l":[[-1,1,"7170608270202402223041306261"]]},"297":{"l":[[-1,1,"111024422122422400013132222132421012413221223241222441322425434412142324142432412444423244343242254548383438"],[0,12,"424112114140010020422220"],[0,4,"313210153231151131320002"],[2,6,"422415353242001041503531"],[0,2,"2402000131302111304010204130202130410100405021204130203050510001"],[0,2,"31320001"]]},"298":{"l":[[-1,1,"63713432715015193130403021313040314140304131"],[0,4,"15105042"]]},"299":{"l":[[-1,1,"5350415033520001615130405150404150404151355551526454"]]},"300":{"l":[[-1,1,"734338287970505153524152314130414353"],[0,4,"426070605051535241520252"],[0,2,"21310242313379705051535241524252"],[0,2,"2002797042607060505153524152606151503141"]]},"301":{"f":"4kabn1/R3a4/4b1P1r/p8/9/2P6/8P/1R1pBC3/2r3p2/3AKABc1","l":[[-1,1,"0131413017105041575070625030"],[0,6,"40503141"]]},"302":{"l":[[-1,1,"545135235181826173706082707182648183"],[0,2,"3543734368382320383157487870495983844765636443476465202282635153"]]}};   // 古谱解法：{局号:{f?:校正局面, l:[[父分支,起始步,着法串]]}}，着法串每4位 x1y1x2y2
+
+function parseFEN(pos){
+  const b=new Array(90).fill(null); let id=0;
+  pos.split('/').forEach((row,r)=>{
+    let c=0;
+    for (const ch of row){
+      if (ch>='0' && ch<='9'){ c+=Number(ch); continue; }
+      const up=ch.toUpperCase();
+      b[r*9+c]={s: ch===up?'r':'b', t: up==='H'?'N':up==='E'?'B':up, id:id++}; c++;
+    }
+  });
+  return b;
+}
+const pad3 = n => String(n).padStart(3,'0');
+
+/* ================= 古谱解法 ================= */
+function decodeMoves(str){
+  const a=[];
+  for (let i=0;i+4<=str.length;i+=4){ const x1=+str[i], y1=+str[i+1], x2=+str[i+2], y2=+str[i+3]; a.push((y1*9+x1)*128 + y2*9+x2); }
+  return a;
+}
+function samePrefix(ms,ln,n){ if (ln.moves.length<n) return false; for (let j=0;j<n;j++) if (ln.moves[j]!==ms[j]) return false; return true; }
+function puzzleFEN(i){ const r=SOLUTIONS[PUZZLES[i][0]]; return (r && r.f) || PUZZLES[i][3]; }
+const solCache=new Map();
+function getSol(i){
+  if (solCache.has(i)) return solCache.get(i);
+  const raw=SOLUTIONS[PUZZLES[i][0]]; let sol=null;
+  if (raw){
+    const fen=puzzleFEN(i), lines=[];
+    raw.l.forEach(([par,start,str],k)=>{
+      const own=decodeMoves(str);
+      const moves = par<0 ? own : lines[par].moves.slice(0,start-1).concat(own);
+      const b=parseFEN(fen), notes=[];
+      for (const m of moves){ notes.push(notation(b,m)); makeMove(b,m); }
+      lines.push({k, name: k ? '变着'+k : '主线', moves, notes});
+    });
+    const main=lines[0].moves;
+    for (const ln of lines){
+      ln.alt = ln.moves.map((m,j)=>lines.some(o=>o!==ln && o.moves.length>j && o.moves[j]!==m && samePrefix(ln.moves,o,j)));
+      ln.fork=0; while (ln.fork<ln.moves.length && ln.moves[ln.fork]===main[ln.fork]) ln.fork++;
+    }
+    sol={fen, lines, fixed:!!raw.f};
+  }
+  solCache.set(i,sol); return sol;
+}
+
+/* ================= 界面 ================= */
+const NS='http://www.w3.org/2000/svg';
+const S=60, M=64;
+const $ = id => document.getElementById(id);
+const svg=$('board'), staticLayer=$('staticLayer'), numLayer=$('numLayer'), lastLayer=$('lastLayer'), pieceLayer=$('pieceLayer'), hintLayer=$('hintLayer');
+
+let board, turn, history, selected, lastMove, gameOver, legalCache, checkNow;
+let thinking=false, thinkLabel='', aiTimer=null, flipped=false, hintMove=null, resultHidden=false;
+const settings = { mode:'ai', human:'r', level:2, puzzle:0, pzMode:'book' };
+let view={line:0, ply:0}, autoTimer=null;
+const pending  = { mode:'ai', human:'r' };
+const solved = new Set();
+const pieceEls = new Map();
+
+const isPuzzle = () => settings.mode==='puzzle';
+const curSol = () => isPuzzle() ? getSol(settings.puzzle) : null;
+const pzMode = () => (isPuzzle() && curSol()) ? settings.pzMode : 'free';
+const inAnswer = () => pzMode()==='answer';
+const vsAI = () => settings.mode==='ai' || (isPuzzle() && !inAnswer());
+const humanSide = () => isPuzzle() ? 'r' : settings.human;
+
+function xy(i){
+  let r=(i/9)|0, c=i%9;
+  if (flipped){ r=9-r; c=8-c; }
+  return [M+c*S, M+r*S];
+}
+
+function drawStatic(){
+  let h = `<rect x="4" y="4" width="600" height="660" rx="12" fill="url(#wood)" stroke="var(--frame)" stroke-width="4"/>`;
+  h += `<rect class="grid-outer" x="${M-7}" y="${M-7}" width="${8*S+14}" height="${9*S+14}"/>`;
+  for (let r=0;r<10;r++) h += `<line class="grid-line" x1="${M}" y1="${M+r*S}" x2="${M+8*S}" y2="${M+r*S}"/>`;
+  for (let c=0;c<9;c++){
+    const x=M+c*S;
+    if (c===0||c===8) h += `<line class="grid-line" x1="${x}" y1="${M}" x2="${x}" y2="${M+9*S}"/>`;
+    else h += `<line class="grid-line" x1="${x}" y1="${M}" x2="${x}" y2="${M+4*S}"/><line class="grid-line" x1="${x}" y1="${M+5*S}" x2="${x}" y2="${M+9*S}"/>`;
+  }
+  const P=(r,c)=>[M+c*S,M+r*S];
+  [[0,3,2,5],[0,5,2,3],[7,3,9,5],[7,5,9,3]].forEach(([r1,c1,r2,c2])=>{
+    const [x1,y1]=P(r1,c1),[x2,y2]=P(r2,c2);
+    h += `<line class="grid-line" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;
+  });
+  const marks=[[2,1],[2,7],[7,1],[7,7],[3,0],[3,2],[3,4],[3,6],[3,8],[6,0],[6,2],[6,4],[6,6],[6,8]];
+  for (const [r,c] of marks){
+    const [x,y]=P(r,c), g=5, l=10;
+    for (const sx of [-1,1]){
+      if ((c===0&&sx<0)||(c===8&&sx>0)) continue;
+      for (const sy of [-1,1])
+        h += `<polyline class="grid-line" fill="none" points="${x+sx*(g+l)},${y+sy*g} ${x+sx*g},${y+sy*g} ${x+sx*g},${y+sy*(g+l)}"/>`;
+    }
+  }
+  h += `<text class="river" x="${M+2*S}" y="${M+4.5*S}">楚　河</text><text class="river" x="${M+6*S}" y="${M+4.5*S}">汉　界</text>`;
+  staticLayer.innerHTML = h;
+}
+function drawNumbers(){
+  const top = flipped ? 'r' : 'b', bot = opp(top);
+  let h='';
+  for (let dc=0; dc<9; dc++){
+    const c = flipped ? 8-dc : dc, x = M+dc*S;
+    h += `<text class="file-num" x="${x}" y="22">${numStr(top,fileNum(top,c))}</text>`;
+    h += `<text class="file-num" x="${x}" y="646">${numStr(bot,fileNum(bot,c))}</text>`;
+  }
+  numLayer.innerHTML = h;
+}
+function makePieceEl(p){
+  const g=document.createElementNS(NS,'g');
+  g.setAttribute('class','piece '+(p.s==='r'?'red':'black'));
+  g.innerHTML = `<circle class="pc-alert" r="33"/><g class="pc-body"><circle class="pc-shadow" r="27.5" cy="3.5"/><circle class="pc-face" r="27.5"/><circle class="pc-ring" r="23"/><text class="pc-char" y="1">${NAME_P[p.s][p.t]}</text></g>`;
+  return g;
+}
+function renderPieces(){
+  const seen=new Set();
+  for (let i=0;i<90;i++){
+    const p=board[i]; if (!p) continue;
+    seen.add(p.id);
+    const [x,y]=xy(i);
+    let g=pieceEls.get(p.id);
+    if (!g){
+      g=makePieceEl(p); g.style.transition='none';
+      g.style.transform=`translate(${x}px,${y}px)`;
+      pieceLayer.appendChild(g); pieceEls.set(p.id,g);
+      g.getBoundingClientRect(); g.style.transition='';
+    } else g.style.transform=`translate(${x}px,${y}px)`;
+    g.classList.toggle('selected', selected===i);
+    g.classList.toggle('checked', p.t==='K' && checkNow && p.s===turn);
+  }
+  for (const [id,g] of pieceEls) if (!seen.has(id)){ g.remove(); pieceEls.delete(id); }
+}
+function renderMarks(){
+  let h='';
+  if (lastMove!=null){
+    const [fx,fy]=xy(lastMove>>7), [tx,ty]=xy(lastMove&127);
+    h += `<circle class="last-from" cx="${fx}" cy="${fy}" r="9"/>`;
+    const o=31, l=9;
+    for (const sx of [-1,1]) for (const sy of [-1,1])
+      h += `<polyline class="last-to" fill="none" points="${tx+sx*o},${ty+sy*(o-l)} ${tx+sx*o},${ty+sy*o} ${tx+sx*(o-l)},${ty+sy*o}"/>`;
+  }
+  lastLayer.innerHTML=h;
+  let hh='';
+  if (hintMove!=null){
+    const [fx,fy]=xy(hintMove>>7), [tx,ty]=xy(hintMove&127);
+    hh += `<circle class="hint-from" cx="${fx}" cy="${fy}" r="33"/><line class="hint-line" x1="${fx}" y1="${fy}" x2="${tx}" y2="${ty}"/><circle class="hint-to" cx="${tx}" cy="${ty}" r="11"/>`;
+  }
+  if (selected!=null){
+    for (const m of legalCache){
+      if ((m>>7)!==selected) continue;
+      const t=m&127, [x,y]=xy(t);
+      hh += board[t] ? `<circle class="hint-cap" cx="${x}" cy="${y}" r="31"/>` : `<circle class="hint-dot" cx="${x}" cy="${y}" r="8"/>`;
+    }
+  }
+  hintLayer.innerHTML=hh;
+}
+function sideName(s){ return s==='r' ? '红方' : '黑方'; }
+function winText(w){
+  if (isPuzzle()) return w==='r' ? '破解成功' : '挑战失败';
+  if (settings.mode==='ai') return w===settings.human ? '你赢了' : '电脑获胜';
+  return sideName(w)+'获胜';
+}
+function renderStatus(){
+  const st=$('status'), dot=$('turnDot');
+  dot.className='turn-dot '+turn;
+  if (inAnswer()){
+    const ln=viewLine(), n=ln.moves.length;
+    let t=`${ln.name}　第 ${view.ply} / ${n} 步`;
+    if (gameOver) t+=`，${sideName(opp(gameOver.winner))}被${gameOver.reason}`;
+    else if (view.ply>=n) t+='，古谱至此结束';
+    st.innerHTML=(checkNow&&!gameOver ? '<span class="alert">将军！</span>' : '')+t;
+    return;
+  }
+  if (gameOver){
+    dot.className='turn-dot '+gameOver.winner;
+    st.textContent = winText(gameOver.winner)+'，'+sideName(opp(gameOver.winner))+'被'+gameOver.reason;
+    return;
+  }
+  let txt;
+  const bs=bookState();
+  if (thinking) txt=thinkLabel;
+  else if (bs==='off') txt='与古谱不同';
+  else if (bs==='end') txt='古谱到此为止';
+  else if (vsAI()) txt = turn===humanSide() ? '轮到你走棋' : '电脑走棋';
+  else txt = sideName(turn)+'走棋';
+  st.innerHTML = (checkNow ? '<span class="alert">将军！</span>' : '') + txt;
+}
+function renderPuzzleHead(){
+  const head=$('puzzleHead');
+  head.hidden = !isPuzzle();
+  if (!isPuzzle()) return;
+  const [n,name,sub]=PUZZLES[settings.puzzle];
+  $('pzTitle').textContent = `第${pad3(n)}局　${name}`;
+  $('pzGoal').textContent = n<=468
+    ? '红先，杀死黑将。' + (sub ? `此局为${sub}。` : '')
+    : `实用残局，古谱结论：${sub}。红先。`;
+  $('pzSolved').hidden = !solved.has(settings.puzzle);
+}
+function renderResult(){
+  const box=$('result');
+  if (!gameOver || resultHidden || inAnswer()){ box.classList.remove('show'); return; }
+  const w=gameOver.winner;
+  $('resultTitle').textContent = winText(w);
+  const again=$('againBtn');
+  if (isPuzzle()){
+    if (w==='r'){
+      $('resultText').textContent = `用 ${Math.ceil(history.length/2)} 步杀死黑将。`;
+      again.textContent = settings.puzzle<PUZZLES.length-1 ? '下一局' : '重来本局';
+    } else {
+      $('resultText').textContent = '黑方反杀了，换个思路再试。';
+      again.textContent = '再试一次';
+    }
+  } else {
+    $('resultText').textContent = `${sideName(opp(w))}被${gameOver.reason}，共 ${Math.ceil(history.length/2)} 回合`;
+    again.textContent = '再来一局';
+  }
+  box.classList.add('show');
+}
+function renderMoves(){
+  const ol=$('moves');
+  $('recTitle').textContent = inAnswer() ? '古谱着法（点任一步跳到该处）' : '棋谱';
+  if (inAnswer()){
+    const ln=viewLine();
+    const cell=(j,cls)=> j<ln.moves.length
+      ? `<button class="mv ${cls}${j<view.ply?'':' future'}${j===view.ply-1?' cur':''}" data-ply="${j+1}">${ln.notes[j]}${ln.alt[j]?'<sup>变</sup>':''}</button>`
+      : '<span></span>';
+    let h='';
+    for (let j=0;j<ln.moves.length;j+=2) h+=`<li><span class="n">${j/2+1}.</span>${cell(j,'rm')}${cell(j+1,'')}</li>`;
+    ol.innerHTML=h;
+    const cur=ol.querySelector('.cur');
+    ol.scrollTop = cur ? Math.max(0, cur.offsetTop - ol.clientHeight/2) : 0;
+    return;
+  }
+  if (!history.length){ ol.innerHTML='<li><span class="empty">尚未走棋</span></li>'; return; }
+  let h='';
+  for (let j=0;j<history.length;j+=2){
+    const a=history[j], z=history[j+1];
+    h += `<li><span class="n">${j/2+1}.</span><span class="rm">${a.note}</span><span>${z?z.note:''}</span></li>`;
+  }
+  ol.innerHTML=h; ol.scrollTop=ol.scrollHeight;
+}
+function optionLabel(i){
+  const [n,name]=PUZZLES[i];
+  return `${solved.has(i)?'✓ ':''}第${pad3(n)}局 ${name}`;
+}
+function buildSelect(){
+  const sel=$('pzSelect');
+  const groups=[['杀局（第1–468局）',0,468],['实用残局（第469–551局）',468,PUZZLES.length]];
+  let h='';
+  for (const [label,a,z] of groups){
+    h+=`<optgroup label="${label}">`;
+    for (let i=a;i<z;i++) h+=`<option value="${i}">${optionLabel(i)}</option>`;
+    h+='</optgroup>';
+  }
+  sel.innerHTML=h;
+}
+function renderControls(){
+  document.querySelectorAll('.seg').forEach(seg=>{
+    const key=seg.dataset.key;
+    const cur = key==='level' ? String(settings.level) : key==='pzMode' ? settings.pzMode : pending[key];
+    seg.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed', String(b.dataset.v===cur)));
+  });
+  $('sideRow').style.display  = pending.mode==='ai' ? '' : 'none';
+  $('levelRow').style.display = (pending.mode==='ai' || (pending.mode==='puzzle' && pzMode()==='free')) ? '' : 'none';
+  const showSol = isPuzzle() && pending.mode==='puzzle', sol=curSol();
+  $('solRow').style.display = showSol ? '' : 'none';
+  if (showSol){
+    $('pzModeSeg').hidden = !sol;
+    if (sol){
+      const v=sol.lines.length-1;
+      $('solInfo').textContent = `主线 ${sol.lines[0].moves.length} 步` + (v ? `，${v} 个变着` : '');
+      $('solSrc').textContent = '解法据 xiangqiqipu.com' + (sol.fixed ? '；本局局面已按解法校正' : '');
+    } else { $('solInfo').textContent='本局暂无古谱解法'; $('solSrc').textContent=''; }
+  }
+  $('levelLabel').textContent = pending.mode==='puzzle' ? '黑方防守强度' : '电脑难度';
+  $('puzzleRow').style.display = pending.mode==='puzzle' ? '' : 'none';
+  const changed = pending.mode!==settings.mode || (pending.mode==='ai' && pending.human!==settings.human);
+  $('note').textContent = changed ? '玩法或执子的改动将在点「新局」后生效。' : '';
+  $('undoBtn').disabled = thinking || !history.length || inAnswer();
+  $('newBtn').textContent = (isPuzzle() && !changed) ? '重来本局' : '新局';
+  const sel=$('pzSelect'); sel.value=String(settings.puzzle);
+  $('pzPrev').disabled = settings.puzzle<=0;
+  $('pzNext').disabled = settings.puzzle>=PUZZLES.length-1;
+  $('pzHint').disabled = !isPuzzle() || thinking || !!gameOver || turn!=='r' || inAnswer() || (pzMode()==='book' && bookState()!=='on');
+  $('pzHint').textContent = pzMode()==='book' ? '古谱提示' : '提示一步';
+  let killSolved=0; for (const i of solved) if (i<468) killSolved++;
+  $('pzProgress').textContent = `已破解 ${solved.size} 局（杀局 ${killSolved}/468）`;
+}
+function bookLinesFor(ms){ const sol=curSol(); return sol ? sol.lines.filter(ln=>samePrefix(ms,ln,ms.length)) : []; }
+function bookLineNext(ms){ return bookLinesFor(ms).find(ln=>ln.moves.length>ms.length) || null; }
+function bookState(){
+  if (pzMode()!=='book') return 'none';
+  const ms=history.map(h=>h.m);
+  if (!bookLinesFor(ms).length) return 'off';
+  if (gameOver) return 'on';
+  return bookLineNext(ms) ? 'on' : 'end';
+}
+const viewLine = () => curSol().lines[view.line];
+function applyView(){
+  const ln=viewLine();
+  view.ply=Math.max(0,Math.min(ln.moves.length,view.ply));
+  board=parseFEN(curSol().fen); turn='r'; history=[];
+  for (let j=0;j<view.ply;j++){ const m=ln.moves[j], cap=makeMove(board,m); history.push({m,cap,note:ln.notes[j]}); turn=opp(turn); }
+  lastMove = history.length ? history[history.length-1].m : null;
+  selected=null; hintMove=null; updateState(); render(); save();
+}
+function stopAuto(){ if (autoTimer){ clearInterval(autoTimer); autoTimer=null; } }
+function step(to){ stopAuto(); view.ply=to; applyView(); }
+function toggleAuto(){
+  if (autoTimer){ stopAuto(); renderSolUI(); return; }
+  if (view.ply>=viewLine().moves.length){ view.ply=0; applyView(); }
+  autoTimer=setInterval(()=>{
+    if (view.ply>=viewLine().moves.length){ stopAuto(); renderSolUI(); return; }
+    view.ply++; applyView();
+  }, 1000);
+  renderSolUI();
+}
+function viewAlts(){
+  const ln=viewLine(), p=view.ply, seen=new Map();
+  if (ln.moves.length>p) seen.set(ln.moves[p], ln);
+  for (const o of curSol().lines) if (o.moves.length>p && samePrefix(ln.moves,o,p) && !seen.has(o.moves[p])) seen.set(o.moves[p], o);
+  return [...seen.values()];
+}
+function chooseLine(k){ stopAuto(); const p=view.ply; view.line=k; view.ply=p+1; applyView(); }
+function backToMain(){ stopAuto(); const f=viewLine().fork; view.line=0; view.ply=Math.min(view.ply,f); applyView(); }
+function renderSolUI(){
+  const ans=inAnswer();
+  $('answerBar').hidden=!ans;
+  if (ans){
+    const ln=viewLine(), n=ln.moves.length;
+    $('stFirst').disabled = $('stPrev').disabled = view.ply<=0;
+    $('stNext').disabled = $('stLast').disabled = view.ply>=n;
+    $('stPlay').textContent = autoTimer ? '暂停' : (view.ply>=n ? '重播' : '播放');
+    const alts=viewAlts(); let h='';
+    if (view.line) h+=`<span>正在看${ln.name}，从第 ${ln.fork+1} 步分出</span><button class="chip" id="toMain">回主线</button>`;
+    if (alts.length>1){
+      if (view.line) h+='<span style="flex-basis:100%;height:0"></span>';
+      h+=`<span>这一步古谱有 ${alts.length} 种走法：</span>`;
+      for (const o of alts) h+=`<button class="chip" data-line="${o.k}" aria-pressed="${o===ln}">${o.name}　${o.notes[view.ply]}</button>`;
+    }
+    $('branchRow').innerHTML=h;
+  }
+  const bs=bookState(), show=(bs==='off'||bs==='end') && !gameOver && !thinking;
+  $('bookBar').hidden=!show;
+  if (show){
+    if (bs==='off'){
+      const prev=history.slice(0,-1).map(h=>h.m), ln=bookLineNext(prev);
+      $('bookMsg').innerHTML = ln ? `与古谱不同。古谱这步走 <b>${ln.notes[prev.length]}</b>。` : '与古谱不同。';
+      $('bookUndo').hidden=false;
+    } else {
+      $('bookMsg').textContent='古谱到此为止，可以和电脑接着下。';
+      $('bookUndo').hidden=true;
+    }
+  }
+}
+function continueWithAI(){ settings.pzMode='free'; save(); render(); maybeAI(); }
+
+function render(){ renderSolUI(); renderPuzzleHead(); renderPieces(); renderMarks(); renderStatus(); renderResult(); renderMoves(); renderControls(); }
+
+function updateState(){
+  legalCache = legalMoves(board,turn);
+  checkNow = inCheck(board,turn);
+  gameOver = legalCache.length ? null : { winner:opp(turn), reason: checkNow ? '绝杀' : '困毙' };
+  resultHidden = false;
+  if (gameOver && isPuzzle() && !inAnswer() && gameOver.winner==='r' && !solved.has(settings.puzzle)){
+    solved.add(settings.puzzle);
+    const opt=$('pzSelect').querySelector(`option[value="${settings.puzzle}"]`);
+    if (opt) opt.textContent=optionLabel(settings.puzzle);
+  }
+}
+function doMove(m){
+  const note=notation(board,m);
+  const cap=makeMove(board,m);
+  history.push({m,cap,note});
+  lastMove=m; turn=opp(turn); selected=null; hintMove=null;
+  updateState(); render(); save(); maybeAI();
+}
+function maybeAI(){
+  if (!vsAI() || gameOver || turn===humanSide()) return;
+  if (pzMode()==='book'){
+    const ms=history.map(h=>h.m), ln=bookLineNext(ms);
+    if (!ln) return;                       // 偏离古谱或古谱已完，等玩家选择
+    thinking=true; thinkLabel='黑方按古谱应着…'; render();
+    aiTimer=setTimeout(()=>{ aiTimer=null; thinking=false; doMove(ln.moves[ms.length]); }, 500);
+    return;
+  }
+  thinking=true; thinkLabel='电脑思考中…'; render();
+  aiTimer=setTimeout(()=>{
+    aiTimer=null;
+    const m=think(board,turn,settings.level);
+    thinking=false;
+    if (m!=null) doMove(m); else render();
+  }, 380);
+}
+function showHint(){
+  if (!isPuzzle() || thinking || gameOver || turn!=='r' || inAnswer()) return;
+  if (pzMode()==='book'){
+    const ms=history.map(h=>h.m), ln=bookLineNext(ms);
+    if (ln){ hintMove=ln.moves[ms.length]; selected=null; render(); }
+    return;
+  }
+  thinking=true; thinkLabel='正在推演提示…'; selected=null; render();
+  aiTimer=setTimeout(()=>{
+    aiTimer=null;
+    hintMove=think(board,'r',3);
+    thinking=false; render();
+  }, 60);
+}
+function undo(){
+  if (thinking || !history.length) return;
+  let n = (vsAI() && turn===humanSide()) ? 2 : 1;
+  n = Math.min(n, history.length);
+  for (let k=0;k<n;k++){ const h=history.pop(); unmakeMove(board,h.m,h.cap); turn=opp(turn); }
+  lastMove = history.length ? history[history.length-1].m : null;
+  selected=null; hintMove=null; updateState(); render(); save(); maybeAI();
+}
+function startPosition(){ return isPuzzle() ? parseFEN(puzzleFEN(settings.puzzle)) : initBoard(); }
+function newGame(){
+  if (aiTimer){ clearTimeout(aiTimer); aiTimer=null; }
+  stopAuto(); view={line:0, ply:0};
+  thinking=false;
+  settings.mode=pending.mode; settings.human=pending.human;
+  pieceLayer.innerHTML=''; pieceEls.clear();
+  board=startPosition(); turn='r'; history=[]; selected=null; lastMove=null; hintMove=null;
+  flipped = settings.mode==='ai' && settings.human==='b';
+  drawNumbers(); updateState(); render(); save(); maybeAI();
+}
+function loadPuzzle(i){
+  settings.puzzle=Math.max(0,Math.min(PUZZLES.length-1,i));
+  pending.mode='puzzle';
+  newGame();
+}
+
+function onBoardClick(e){
+  if (gameOver || thinking || inAnswer()) return;
+  if (vsAI() && turn!==humanSide()) return;
+  if (pzMode()==='book' && bookState()!=='on') return;
+  const pt=svg.createSVGPoint(); pt.x=e.clientX; pt.y=e.clientY;
+  const p=pt.matrixTransform(svg.getScreenCTM().inverse());
+  let c=Math.round((p.x-M)/S), r=Math.round((p.y-M)/S);
+  if (c<0||c>8||r<0||r>9) return;
+  if (Math.hypot(p.x-(M+c*S), p.y-(M+r*S)) > S*0.55) return;
+  if (flipped){ r=9-r; c=8-c; }
+  const i=r*9+c, pc=board[i];
+  if (selected!=null){
+    const m=selected*128+i;
+    if (legalCache.includes(m)){ doMove(m); return; }
+  }
+  selected = (pc && pc.s===turn && selected!==i) ? i : null;
+  renderPieces(); renderMarks();
+}
+
+/* ================= 存档 ================= */
+const KEY='xiangqi-save-v1';
+function save(){
+  try{
+    localStorage.setItem(KEY, JSON.stringify({settings, pending, flipped, view, moves:history.map(h=>h.m), solved:[...solved]}));
+  }catch(e){}
+}
+function load(){
+  let data=null;
+  try{ data=JSON.parse(localStorage.getItem(KEY)||'null'); }catch(e){}
+  if (!data || !data.settings) return false;
+  Object.assign(settings, data.settings);
+  Object.assign(pending, data.pending || data.settings);
+  if (!(settings.puzzle>=0 && settings.puzzle<PUZZLES.length)) settings.puzzle=0;
+  (data.solved||[]).forEach(i=>{ if (i>=0 && i<PUZZLES.length) solved.add(i); });
+  buildSelect();
+  board=startPosition(); turn='r'; history=[]; selected=null; lastMove=null;
+  for (const m of data.moves||[]){
+    if (!legalMoves(board,turn).includes(m)) break;
+    const note=notation(board,m), cap=makeMove(board,m);
+    history.push({m,cap,note}); lastMove=m; turn=opp(turn);
+  }
+  flipped=!!data.flipped;
+  drawNumbers();
+  if (inAnswer()){
+    const v=data.view||{};
+    view = curSol().lines[v.line] ? {line:v.line, ply:v.ply|0} : {line:0, ply:0};
+    applyView(); return true;
+  }
+  updateState(); render(); maybeAI();
+  return true;
+}
+
+/* ================= 绑定 ================= */
+svg.addEventListener('click', onBoardClick);
+$('undoBtn').addEventListener('click', undo);
+$('newBtn').addEventListener('click', newGame);
+$('againBtn').addEventListener('click', ()=>{
+  if (isPuzzle() && gameOver && gameOver.winner==='r' && settings.puzzle<PUZZLES.length-1) loadPuzzle(settings.puzzle+1);
+  else newGame();
+});
+$('viewBtn').addEventListener('click', ()=>{ resultHidden=true; renderResult(); });
+$('flipBtn').addEventListener('click', ()=>{ flipped=!flipped; drawNumbers(); render(); save(); });
+$('pzSelect').addEventListener('change', e=>loadPuzzle(Number(e.target.value)));
+$('pzPrev').addEventListener('click', ()=>loadPuzzle(settings.puzzle-1));
+$('pzNext').addEventListener('click', ()=>loadPuzzle(settings.puzzle+1));
+$('pzHint').addEventListener('click', showHint);
+$('stFirst').addEventListener('click', ()=>step(0));
+$('stPrev').addEventListener('click', ()=>step(view.ply-1));
+$('stNext').addEventListener('click', ()=>step(view.ply+1));
+$('stLast').addEventListener('click', ()=>step(viewLine().moves.length));
+$('stPlay').addEventListener('click', toggleAuto);
+$('branchRow').addEventListener('click', e=>{
+  const b=e.target.closest('button'); if (!b) return;
+  if (b.id==='toMain') backToMain(); else if (b.dataset.line) chooseLine(Number(b.dataset.line));
+});
+$('moves').addEventListener('click', e=>{ const b=e.target.closest('.mv'); if (b && inAnswer()) step(Number(b.dataset.ply)); });
+$('bookUndo').addEventListener('click', undo);
+$('bookAI').addEventListener('click', continueWithAI);
+document.addEventListener('keydown', e=>{
+  if (!inAnswer() || e.target.closest('select,input,textarea')) return;
+  if (e.key==='ArrowRight' && view.ply<viewLine().moves.length){ e.preventDefault(); step(view.ply+1); }
+  else if (e.key==='ArrowLeft' && view.ply>0){ e.preventDefault(); step(view.ply-1); }
+});
+document.querySelectorAll('.seg').forEach(seg=>{
+  seg.addEventListener('click', e=>{
+    const b=e.target.closest('button'); if (!b) return;
+    const key=seg.dataset.key, v=b.dataset.v;
+    if (key==='level'){ settings.level=Number(v); renderControls(); save(); return; }
+    if (key==='pzMode'){ settings.pzMode=v; newGame(); return; }
+    pending[key]=v;
+    if (!history.length && !thinking) newGame(); else { renderControls(); save(); }
+  });
+});
+
+drawStatic();
+if (!load()){ buildSelect(); newGame(); }
+})();
+</script>
+<script>
+// 离线缓存：首次联网打开后，整个程序存到本机，之后断网也能用
+if ('serviceWorker' in navigator && location.protocol==='https:') navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script>
+</body>
+</html>

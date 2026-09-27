@@ -1,0 +1,24 @@
+中国象棋 · iPhone 离线版 上传说明
+
+一、上传到 GitHub Pages（免费，只需做一次）
+1. 在 Safari 打开 github.com，注册并登录账号。
+2. 点右上角“+” → New repository。Repository name 填 xiangqi，选 Public，点 Create repository。
+3. 在新仓库页面点 “uploading an existing file”（或 Add file → Upload files）。
+4. 点 choose your files，从“文件”App 里选中本文件夹里的全部文件
+   （index.html、sw.js、manifest.webmanifest、mashanzheng.woff2、三个 icon 图片），
+   注意选的是文件本身，不是文件夹。上传完点页面底部 Commit changes。
+5. 进入仓库的 Settings → 左侧 Pages → Branch 选 main，文件夹选 /(root)，点 Save。
+6. 等 1～2 分钟刷新该页，顶部会出现网址：https://你的用户名.github.io/xiangqi/
+
+二、装到 iPhone 主屏幕（需要联网）
+1. 用 Safari 打开上面的网址，等棋盘完整显示出来。
+2. 点底部“分享”按钮 → 添加到主屏幕 → 添加。
+3. 从主屏幕的“帅”字图标打开一次，走一两步确认正常。
+
+三、离线使用
+之后开飞行模式也能从主屏幕图标打开，破解记录照常保存。
+注意：从主屏幕图标打开和在 Safari 里打开网址，进度是分开保存的，请固定用主屏幕图标。
+
+四、以后更新
+收到新版本文件后，在 GitHub 仓库里用 Add file → Upload files 上传覆盖同名文件，
+然后联网从主屏幕打开一次，关掉再打开就是新版。
