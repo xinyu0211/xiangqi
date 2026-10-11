@@ -1,5 +1,5 @@
 // 版本号：程序更新时改这里，手机联网打开后会自动换成新版
-const VERSION = 'xiangqi-2026-09-27b';
+const VERSION = 'xiangqi-2026-10-11b';
 const FILES = ['./', './index.html', './mashanzheng.woff2', './manifest.webmanifest', './icon-180.png', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
