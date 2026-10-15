@@ -106,7 +106,8 @@ select{
 select:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 .pz-nav{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .panel{display:grid;gap:16px;align-content:start;padding:0 4px;min-width:0}
-.actions{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.actions{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.actions button{padding:10px 4px}
 button{
   font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--rule);
   border-radius:10px;padding:10px 12px;cursor:pointer;min-height:44px;
@@ -155,6 +156,23 @@ button.primary{background:var(--accent);color:var(--accent-ink);border-color:var
 .moves .mv sup{font-family:system-ui,sans-serif;font-size:11px;color:#C27C0E;margin-left:2px}
 .moves .mv.cur sup{color:inherit}
 
+.linkbtn{min-height:30px;padding:2px 12px;font-size:13px;border-radius:999px;margin-left:4px}
+.palette{display:grid;grid-template-columns:repeat(7,1fr);gap:8px 6px}
+.pal{position:relative;aspect-ratio:1;min-height:0;padding:0;border-radius:50%;background:var(--face);border:1.5px solid var(--edge);
+  box-shadow:0 2px 0 rgba(60,32,8,.35);display:grid;place-items:center;line-height:1;
+  font-family:"Ma Shan Zheng",KaiTi,STKaiti,"Kaiti SC",serif;font-size:clamp(20px,6vw,28px)}
+.pal .ch{-webkit-text-stroke:.6px currentColor}
+.pal.r{color:var(--red)} .pal.b{color:var(--black)}
+.pal.full{opacity:.4}
+.pal[aria-pressed="true"]{outline:3px solid var(--accent);outline-offset:2px;opacity:1}
+.pal .cnt{position:absolute;right:-5px;bottom:-5px;font:600 11px/1 system-ui,sans-serif;background:var(--panel);color:var(--muted);
+  border:1px solid var(--rule);border-radius:999px;padding:2px 5px;-webkit-text-stroke:0}
+.tools{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.tools button{padding:8px 2px;min-height:40px}
+.tools button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+.setup-go{display:grid;grid-template-columns:1fr 2fr;gap:8px}
+.editing .panel,.editing #puzzleHead{display:none !important}
+
 @media (min-width:880px){
   .app{grid-template-columns:minmax(0,600px) minmax(260px,1fr);padding:24px 20px 40px;column-gap:28px}
   header{grid-column:1/-1}
@@ -167,7 +185,7 @@ button.primary{background:var(--accent);color:var(--accent-ink);border-color:var
 <div class="app">
   <header>
     <h1>中国象棋</h1>
-    <p>点选己方棋子，再点落点。可对弈，也可练《适情雅趣》全部 551 局古谱，并按古谱解法练习或看答案。</p>
+    <p>点选己方棋子，再点落点。可对弈、自由摆棋，也可练《适情雅趣》全部 551 局古谱，并按古谱解法练习或看答案。</p>
   </header>
 
   <section class="play">
@@ -218,12 +236,32 @@ button.primary{background:var(--accent);color:var(--accent-ink);border-color:var
         <button class="primary" id="bookAI">继续和电脑下</button>
       </div>
     </div>
+    <div class="sol-bar" id="setupBar" hidden>
+      <div class="palette" id="palette"></div>
+      <div class="tools" id="tools">
+        <button data-tool="move">移动</button>
+        <button data-tool="erase">删除</button>
+        <button data-act="clear">清空</button>
+        <button data-act="init">开局</button>
+        <button data-act="flip">翻转</button>
+      </div>
+      <div class="setting">
+        <span class="label">谁先走</span>
+        <div class="seg" id="setupTurn"><button data-v="r">红先</button><button data-v="b">黑先</button></div>
+      </div>
+      <div class="setting">
+        <span class="label">摆好后怎么下</span>
+        <div class="seg" id="setupPlay"><button data-v="ai-r">执红对电脑</button><button data-v="ai-b">执黑对电脑</button><button data-v="pvp">双人同屏</button></div>
+      </div>
+      <div class="setup-go"><button id="setupCancel">取消</button><button class="primary" id="setupStart">开始下棋</button></div>
+    </div>
   </section>
 
   <aside class="panel">
     <div class="actions">
       <button id="undoBtn">悔棋</button>
       <button id="flipBtn">翻转棋盘</button>
+      <button id="setupBtn">摆棋</button>
       <button id="newBtn" class="primary">新局</button>
     </div>
     <div class="setting">
@@ -448,7 +486,7 @@ function isAttackMove(b,m,side){
 function bannedMoves(b,side,moves){
   const banned=new Set();
   if (!history.length) return banned;
-  const sb=startPosition(); let sd='r';
+  const sb=startPosition(); let sd=startTurn();
   const keys=[posKey(sb,sd)], tags=[];
   for (const h of history){ makeMove(sb,h.m); tags.push(isAttackMove(sb,h.m,sd)); sd=opp(sd); keys.push(posKey(sb,sd)); }
   const n=history.length;
@@ -460,7 +498,7 @@ function bannedMoves(b,side,moves){
     if (!atk) continue;
     let mine=true, theirs=true;
     for (let i=j;i<n;i++){
-      const mover = i%2 ? 'b' : 'r';
+      const mover = i%2 ? opp(startTurn()) : startTurn();
       if (mover===side){ if (!tags[i]) mine=false; } else if (!tags[i]) theirs=false;
     }
     if (mine && !theirs) banned.add(m);
@@ -632,6 +670,106 @@ function getSol(i){
   solCache.set(i,sol); return sol;
 }
 
+/* ================= 摆棋 ================= */
+const LIMIT={K:1,A:2,B:2,N:2,R:2,C:2,P:5}, PAL_ORDER=['K','A','B','N','R','C','P'];
+let editing=null, uid=100000;
+function boardToFEN(b){
+  const rows=[];
+  for (let r=0;r<10;r++){ let s='',e=0;
+    for (let c=0;c<9;c++){ const p=b[r*9+c]; if(!p){e++;continue;} if(e){s+=e;e=0;} s+= p.s==='r'?p.t:p.t.toLowerCase(); }
+    if (e) s+=e; rows.push(s); }
+  return rows.join('/');
+}
+function countPieces(b){ const n={r:{},b:{}}; for (const p of b) if (p) n[p.s][p.t]=(n[p.s][p.t]||0)+1; return n; }
+function placeOK(s,t,i){
+  const r=(i/9)|0, c=i%9;
+  switch (t){
+    case 'K': return inPalace(s,r,c);
+    case 'A': return inPalace(s,r,c) && (r+c)%2===(s==='r'?0:1);
+    case 'B': return c%2===0 && (s==='r' ? [5,7,9] : [0,2,4]).includes(r) && (c%4===((r===7||r===2)?0:2));
+    case 'P': return s==='r' ? (r<=4 || (r<=6 && c%2===0)) : (r>=5 || (r>=3 && c%2===0));
+  }
+  return true;
+}
+function placeMsg(s,t){
+  const nm=NAME_P[s][t];
+  return t==='K' ? `${nm}只能放在九宫里` : t==='A' ? `${nm}只能放在九宫的五个点上`
+       : t==='B' ? `${nm}只能放在本方七个${nm}位上` : `${nm}只能放在${nm}位或过河后的位置`;
+}
+const freshIds = b => b.map(p=>p?{s:p.s,t:p.t,id:uid++}:null);
+function enterSetup(){
+  if (aiTimer){ clearTimeout(aiTimer); aiTimer=null; }
+  thinking=false; stopAuto();
+  editing={ saved:board, tool:null, turn, msg:'',
+            play: settings.mode==='pvp' ? 'pvp' : settings.mode==='ai' ? 'ai-'+settings.human : 'ai-r' };
+  board=board.map(p=>p?{...p}:null); selected=null; hintMove=null; checkNow=false;
+  document.body.classList.add('editing'); render();
+}
+function exitSetup(){ document.body.classList.remove('editing'); editing=null; selected=null; }
+function cancelSetup(){
+  const saved=editing.saved; exitSetup();
+  board=saved; pieceLayer.innerHTML=''; pieceEls.clear();
+  updateState(); render(); maybeAI();
+}
+function setupClick(i){
+  const e=editing, p=board[i]; e.msg='';
+  if (e.tool==='erase'){ board[i]=null; }
+  else if (e.tool){
+    const s=e.tool[0], t=e.tool[1];
+    if (p && p.s===s && p.t===t) board[i]=null;                 // 再点同一个子＝拿掉
+    else if (!placeOK(s,t,i)) e.msg=placeMsg(s,t);
+    else if ((countPieces(board)[s][t]||0) >= LIMIT[t]) e.msg=`${NAME_P[s][t]}最多 ${LIMIT[t]} 个`;
+    else board[i]={s,t,id:uid++};
+  } else {                                                      // 移动
+    if (selected==null || selected===i || p) selected = (p && selected!==i) ? i : null;
+    else {
+      const q=board[selected];
+      if (placeOK(q.s,q.t,i)){ board[i]=q; board[selected]=null; selected=null; }
+      else e.msg=placeMsg(q.s,q.t);
+    }
+  }
+  render();
+}
+function validateSetup(){
+  const c=countPieces(board), e=editing;
+  if (!c.r.K || !c.b.K) return '请摆上红帅和黑将';
+  const kr=findKing(board,'r'), kb=findKing(board,'b');
+  if (kr%9===kb%9){ let open=true; for (let x=kb+9;x<kr;x+=9) if (board[x]){ open=false; break; } if (open) return '帅和将不能直接照面'; }
+  const other=opp(e.turn);
+  if (inCheck(board,other)) return `轮到${sideName(e.turn)}走，${sideName(other)}却正被将军，这样的局面不会出现。请调整，或改成${e.turn==='r'?'黑':'红'}先`;
+  if (!legalMoves(board,e.turn).length) return `${sideName(e.turn)}已经无棋可走，请调整局面`;
+  return '';
+}
+function startFromSetup(){
+  const err=validateSetup();
+  if (err){ editing.msg=err; render(); return; }
+  const e=editing;
+  settings.custom={ fen:boardToFEN(board), turn:e.turn };
+  pending.mode = e.play==='pvp' ? 'pvp' : 'ai';
+  if (e.play!=='pvp') pending.human = e.play==='ai-b' ? 'b' : 'r';
+  exitSetup(); newGame();
+}
+function setupTip(){
+  const e=editing;
+  if (e.tool==='erase') return '点棋盘上的子，把它拿掉';
+  if (e.tool) return `点棋盘放${NAME_P[e.tool[0]][e.tool[1]]}，再点一次可拿掉`;
+  return selected!=null ? '点空位，把这个子移过去' : '选下方的子放到棋盘上，或点棋盘上的子移动';
+}
+function renderSetupBar(){
+  const bar=$('setupBar'); bar.hidden=!editing;
+  if (!editing) return;
+  const c=countPieces(board); let h='';
+  for (const s of ['r','b']) for (const t of PAL_ORDER){
+    const n=c[s][t]||0, key=s+t;
+    h+=`<button class="pal ${s}${n>=LIMIT[t]?' full':''}" data-p="${key}" aria-pressed="${editing.tool===key}" aria-label="${NAME_P[s][t]}，已摆 ${n} 个"><span class="ch">${NAME_P[s][t]}</span><span class="cnt">${n}/${LIMIT[t]}</span></button>`;
+  }
+  $('palette').innerHTML=h;
+  $('tools').querySelector('[data-tool=move]').setAttribute('aria-pressed', String(editing.tool===null));
+  $('tools').querySelector('[data-tool=erase]').setAttribute('aria-pressed', String(editing.tool==='erase'));
+  $('setupTurn').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed', String(b.dataset.v===editing.turn)));
+  $('setupPlay').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed', String(b.dataset.v===editing.play)));
+}
+
 /* ================= 界面 ================= */
 const NS='http://www.w3.org/2000/svg';
 const S=60, M=64;
@@ -650,6 +788,7 @@ const isPuzzle = () => settings.mode==='puzzle';
 const curSol = () => isPuzzle() ? getSol(settings.puzzle) : null;
 const pzMode = () => (isPuzzle() && curSol()) ? settings.pzMode : 'free';
 const inAnswer = () => pzMode()==='answer';
+function startTurn(){ return (!isPuzzle() && settings.custom) ? settings.custom.turn : 'r'; }
 const vsAI = () => settings.mode==='ai' || (isPuzzle() && !inAnswer());
 const humanSide = () => isPuzzle() ? 'r' : settings.human;
 
@@ -720,6 +859,14 @@ function renderPieces(){
   for (const [id,g] of pieceEls) if (!seen.has(id)){ g.remove(); pieceEls.delete(id); }
 }
 function renderMarks(){
+  if (editing){
+    lastLayer.innerHTML=''; let hh='', s=null, t=null;
+    if (editing.tool && editing.tool!=='erase'){ s=editing.tool[0]; t=editing.tool[1]; }
+    else if (selected!=null && board[selected]){ s=board[selected].s; t=board[selected].t; }
+    if (t && 'KAB'.includes(t))
+      for (let i=0;i<90;i++) if (!board[i] && placeOK(s,t,i)){ const [x,y]=xy(i); hh+=`<circle class="hint-dot" cx="${x}" cy="${y}" r="7"/>`; }
+    hintLayer.innerHTML=hh; return;
+  }
   let h='';
   if (lastMove!=null){
     const [fx,fy]=xy(lastMove>>7), [tx,ty]=xy(lastMove&127);
@@ -752,6 +899,11 @@ function winText(w){
 function renderStatus(){
   const st=$('status'), dot=$('turnDot');
   dot.className='turn-dot '+turn;
+  if (editing){
+    dot.className='turn-dot '+editing.turn;
+    st.innerHTML = editing.msg ? '<span class="alert">'+editing.msg+'</span>' : setupTip();
+    return;
+  }
   if (inAnswer()){
     const ln=viewLine(), n=ln.moves.length;
     let t=`${ln.name}　第 ${view.ply} / ${n} 步`;
@@ -777,7 +929,13 @@ function renderStatus(){
 }
 function renderPuzzleHead(){
   const head=$('puzzleHead');
-  head.hidden = !isPuzzle();
+  const custom = !isPuzzle() && !!settings.custom;
+  head.hidden = !isPuzzle() && !custom;
+  if (custom){
+    $('pzTitle').textContent='自摆局面';
+    $('pzGoal').innerHTML=`${settings.custom.turn==='r'?'红':'黑'}方先走。<button class="linkbtn" id="customReset">恢复标准开局</button>`;
+    $('pzSolved').hidden=true; return;
+  }
   if (!isPuzzle()) return;
   const [n,name,sub]=PUZZLES[settings.puzzle];
   $('pzTitle').textContent = `第${pad3(n)}局　${name}`;
@@ -788,7 +946,7 @@ function renderPuzzleHead(){
 }
 function renderResult(){
   const box=$('result');
-  if (!gameOver || resultHidden || inAnswer()){ box.classList.remove('show'); return; }
+  if (!gameOver || resultHidden || inAnswer() || editing){ box.classList.remove('show'); return; }
   const w=gameOver.winner;
   $('resultTitle').textContent = winText(w);
   const again=$('againBtn');
@@ -823,10 +981,10 @@ function renderMoves(){
   }
   if (!history.length){ ol.innerHTML='<li><span class="empty">尚未走棋</span></li>'; return; }
   let h='';
-  for (let j=0;j<history.length;j+=2){
-    const a=history[j], z=history[j+1];
-    h += `<li><span class="n">${j/2+1}.</span><span class="rm">${a.note}</span><span>${z?z.note:''}</span></li>`;
-  }
+  const notes=history.map(x=>x.note);
+  if (startTurn()==='b') notes.unshift('…');                 // 黑先：第一回合红方位置留空
+  for (let j=0;j<notes.length;j+=2)
+    h += `<li><span class="n">${j/2+1}.</span><span class="rm">${notes[j]}</span><span>${notes[j+1]||''}</span></li>`;
   ol.innerHTML=h; ol.scrollTop=ol.scrollHeight;
 }
 function optionLabel(i){
@@ -846,7 +1004,7 @@ function buildSelect(){
 }
 function renderControls(){
   document.querySelectorAll('.seg').forEach(seg=>{
-    const key=seg.dataset.key;
+    const key=seg.dataset.key; if (!key) return;
     const cur = key==='level' ? String(settings.level) : key==='pzMode' ? settings.pzMode : pending[key];
     seg.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed', String(b.dataset.v===cur)));
   });
@@ -867,7 +1025,7 @@ function renderControls(){
   const changed = pending.mode!==settings.mode || (pending.mode==='ai' && pending.human!==settings.human);
   $('note').textContent = changed ? '玩法或执子的改动将在点「新局」后生效。' : '';
   $('undoBtn').disabled = thinking || !history.length || inAnswer();
-  $('newBtn').textContent = (isPuzzle() && !changed) ? '重来本局' : '新局';
+  $('newBtn').textContent = ((isPuzzle() || settings.custom) && !changed) ? '重来本局' : '新局';
   const sel=$('pzSelect'); sel.value=String(settings.puzzle);
   $('pzPrev').disabled = settings.puzzle<=0;
   $('pzNext').disabled = settings.puzzle>=PUZZLES.length-1;
@@ -914,6 +1072,7 @@ function viewAlts(){
 function chooseLine(k){ stopAuto(); const p=view.ply; view.line=k; view.ply=p+1; applyView(); }
 function backToMain(){ stopAuto(); const f=viewLine().fork; view.line=0; view.ply=Math.min(view.ply,f); applyView(); }
 function renderSolUI(){
+  if (editing){ $('answerBar').hidden=true; $('bookBar').hidden=true; return; }
   const ans=inAnswer();
   $('answerBar').hidden=!ans;
   if (ans){
@@ -945,7 +1104,7 @@ function renderSolUI(){
 }
 function continueWithAI(){ settings.pzMode='free'; save(); render(); maybeAI(); }
 
-function render(){ renderSolUI(); renderPuzzleHead(); renderPieces(); renderMarks(); renderStatus(); renderResult(); renderMoves(); renderControls(); }
+function render(){ renderSetupBar(); renderSolUI(); renderPuzzleHead(); renderPieces(); renderMarks(); renderStatus(); renderResult(); renderMoves(); renderControls(); }
 
 function updateState(){
   legalCache = legalMoves(board,turn);
@@ -967,7 +1126,7 @@ function doMove(m){
   updateState(); render(); save(); maybeAI();
 }
 function maybeAI(){
-  if (!vsAI() || gameOver || turn===humanSide()) return;
+  if (editing || !vsAI() || gameOver || turn===humanSide()) return;
   if (pzMode()==='book'){
     const ms=history.map(h=>h.m), ln=bookLineNext(ms);
     if (!ln) return;                       // 偏离古谱或古谱已完，等玩家选择
@@ -1006,14 +1165,14 @@ function undo(){
   lastMove = history.length ? history[history.length-1].m : null;
   selected=null; hintMove=null; updateState(); render(); save(); maybeAI();
 }
-function startPosition(){ return isPuzzle() ? parseFEN(puzzleFEN(settings.puzzle)) : initBoard(); }
+function startPosition(){ return isPuzzle() ? parseFEN(puzzleFEN(settings.puzzle)) : settings.custom ? parseFEN(settings.custom.fen) : initBoard(); }
 function newGame(){
   if (aiTimer){ clearTimeout(aiTimer); aiTimer=null; }
   stopAuto(); view={line:0, ply:0};
   thinking=false;
   settings.mode=pending.mode; settings.human=pending.human;
   pieceLayer.innerHTML=''; pieceEls.clear();
-  board=startPosition(); turn='r'; history=[]; selected=null; lastMove=null; hintMove=null; flashMsg='';
+  board=startPosition(); turn=startTurn(); history=[]; selected=null; lastMove=null; hintMove=null; flashMsg='';
   flipped = settings.mode==='ai' && settings.human==='b';
   drawNumbers(); updateState(); render(); save(); maybeAI();
 }
@@ -1023,17 +1182,22 @@ function loadPuzzle(i){
   newGame();
 }
 
-function onBoardClick(e){
-  if (gameOver || thinking || inAnswer()) return;
-  if (vsAI() && turn!==humanSide()) return;
-  if (pzMode()==='book' && bookState()!=='on') return;
+function squareAt(e){
   const pt=svg.createSVGPoint(); pt.x=e.clientX; pt.y=e.clientY;
   const p=pt.matrixTransform(svg.getScreenCTM().inverse());
   let c=Math.round((p.x-M)/S), r=Math.round((p.y-M)/S);
-  if (c<0||c>8||r<0||r>9) return;
-  if (Math.hypot(p.x-(M+c*S), p.y-(M+r*S)) > S*0.55) return;
+  if (c<0||c>8||r<0||r>9) return -1;
+  if (Math.hypot(p.x-(M+c*S), p.y-(M+r*S)) > S*0.55) return -1;
   if (flipped){ r=9-r; c=8-c; }
-  const i=r*9+c, pc=board[i];
+  return r*9+c;
+}
+function onBoardClick(e){
+  if (editing){ const i=squareAt(e); if (i>=0) setupClick(i); return; }
+  if (gameOver || thinking || inAnswer()) return;
+  if (vsAI() && turn!==humanSide()) return;
+  if (pzMode()==='book' && bookState()!=='on') return;
+  const i=squareAt(e); if (i<0) return;
+  const pc=board[i];
   if (selected!=null){
     const m=selected*128+i;
     if (legalCache.includes(m)){
@@ -1067,7 +1231,7 @@ function load(){
   if (!(settings.puzzle>=0 && settings.puzzle<PUZZLES.length)) settings.puzzle=0;
   (data.solved||[]).forEach(i=>{ if (i>=0 && i<PUZZLES.length) solved.add(i); });
   buildSelect();
-  board=startPosition(); turn='r'; history=[]; selected=null; lastMove=null;
+  board=startPosition(); turn=startTurn(); history=[]; selected=null; lastMove=null;
   for (const m of data.moves||[]){
     if (!legalMoves(board,turn).includes(m)) break;
     const note=notation(board,m), cap=makeMove(board,m);
@@ -1098,6 +1262,26 @@ $('pzSelect').addEventListener('change', e=>loadPuzzle(Number(e.target.value)));
 $('pzPrev').addEventListener('click', ()=>loadPuzzle(settings.puzzle-1));
 $('pzNext').addEventListener('click', ()=>loadPuzzle(settings.puzzle+1));
 $('pzHint').addEventListener('click', showHint);
+$('setupBtn').addEventListener('click', enterSetup);
+$('setupCancel').addEventListener('click', cancelSetup);
+$('setupStart').addEventListener('click', startFromSetup);
+$('palette').addEventListener('click', e=>{
+  const b=e.target.closest('.pal'); if (!b || !editing) return;
+  editing.tool = editing.tool===b.dataset.p ? null : b.dataset.p;
+  selected=null; editing.msg=''; render();
+});
+$('tools').addEventListener('click', e=>{
+  const b=e.target.closest('button'); if (!b || !editing) return;
+  editing.msg='';
+  if (b.dataset.tool){ editing.tool = b.dataset.tool==='erase' ? 'erase' : null; selected=null; }
+  else if (b.dataset.act==='clear'){ board=new Array(90).fill(null); selected=null; }
+  else if (b.dataset.act==='init'){ board=freshIds(initBoard()); selected=null; }
+  else if (b.dataset.act==='flip'){ flipped=!flipped; drawNumbers(); }
+  render();
+});
+$('setupTurn').addEventListener('click', e=>{ const b=e.target.closest('button'); if (b && editing){ editing.turn=b.dataset.v; editing.msg=''; render(); } });
+$('setupPlay').addEventListener('click', e=>{ const b=e.target.closest('button'); if (b && editing){ editing.play=b.dataset.v; editing.msg=''; render(); } });
+$('puzzleHead').addEventListener('click', e=>{ if (e.target.id==='customReset'){ settings.custom=null; newGame(); } });
 $('stFirst').addEventListener('click', ()=>step(0));
 $('stPrev').addEventListener('click', ()=>step(view.ply-1));
 $('stNext').addEventListener('click', ()=>step(view.ply+1));
@@ -1111,7 +1295,7 @@ $('moves').addEventListener('click', e=>{ const b=e.target.closest('.mv'); if (b
 $('bookUndo').addEventListener('click', undo);
 $('bookAI').addEventListener('click', continueWithAI);
 document.addEventListener('keydown', e=>{
-  if (!inAnswer() || e.target.closest('select,input,textarea')) return;
+  if (editing || !inAnswer() || e.target.closest('select,input,textarea')) return;
   if (e.key==='ArrowRight' && view.ply<viewLine().moves.length){ e.preventDefault(); step(view.ply+1); }
   else if (e.key==='ArrowLeft' && view.ply>0){ e.preventDefault(); step(view.ply-1); }
 });
@@ -1119,6 +1303,7 @@ document.querySelectorAll('.seg').forEach(seg=>{
   seg.addEventListener('click', e=>{
     const b=e.target.closest('button'); if (!b) return;
     const key=seg.dataset.key, v=b.dataset.v;
+    if (!key) return;
     if (key==='level'){ settings.level=Number(v); renderControls(); save(); return; }
     if (key==='pzMode'){ settings.pzMode=v; newGame(); return; }
     pending[key]=v;
